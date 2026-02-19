@@ -3,3 +3,8 @@ pandas
 numpy
 scikit-learn
 plotly
+optuna
+torch
+torch-geometric
+rdkit-pypi
+requests
