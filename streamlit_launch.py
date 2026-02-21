@@ -9,9 +9,11 @@ import subprocess
 
 #file = deep.py
 file = "chemnanobew_app.py"
+#file = "new_app.py"
 
 subprocess.Popen(
     ["streamlit", "run", file], shell=True
 )
+
 
 
