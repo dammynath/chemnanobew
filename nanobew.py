@@ -3,6 +3,7 @@ chemnanobew_app.py – Synthesis Optimization Suite (RDKit‑free)
 Deploy on Streamlit Cloud with no RDKit dependency.
 """
 
+pip install --upgrade pip
 import streamlit as st
 import numpy as np
 import pandas as pd
