@@ -358,7 +358,7 @@ def main():
     else:
         display_deepseek_chatbox()
 
-    st.markdown("<div class='footer'>Powered by Streamlit • RDKit‑free version</div>", unsafe_allow_html=True)
+    st.markdown("<div class='footer'>Powered by CHEMNANOBEW GROUP • RDKit‑free version</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
