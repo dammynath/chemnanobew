@@ -294,35 +294,174 @@ def display_molecular_generator_tab():
 # ============================================================================
 # Tab: Deepseek AI Assistant (unchanged)
 # ============================================================================
+# ============================================================================
+# DEEPSEEK CHATBOX TAB
+# ============================================================================
+
 class DeepseekChatbot:
+    """Simple chatbot for synthesis advice"""
+    
     def __init__(self):
-        self.history = []
-    def get_response(self, msg):
-        m = msg.lower()
-        if 'quantum' in m or 'qd' in m:
-            return "For CIS/ZnS QDs: Cu:In ratio 0.8‑1.2, T 180‑220°C, time 60‑120 min."
-        if 'porphyrin' in m:
-            return "Lindsey method: 10 mM aldehyde/pyrrole, BF3·OEt2, DDQ oxidation."
-        if 'optim' in m:
-            return "Use Bayesian optimization with Gaussian processes."
-        return "Ask about QDs, porphyrins, or optimization!"
+        self.conversation_history = []
+    
+    def get_response(self, user_message):
+        """Generate response based on user message"""
+        user_message_lower = user_message.lower()
+        
+        if 'quantum dot' in user_message_lower or 'qd' in user_message_lower:
+            return self.get_qd_response(user_message)
+        elif 'porphyrin' in user_message_lower:
+            return self.get_porphyrin_response(user_message)
+        elif 'optimiz' in user_message_lower:
+            return self.get_optimization_response(user_message)
+        elif 'hello' in user_message_lower or 'hi' in user_message_lower:
+            return self.get_greeting()
+        else:
+            return self.get_general_response()
+    
+    def get_qd_response(self, query):
+        return """🎯 **Quantum Dot Synthesis Advice**
+
+For optimal CIS/ZnS quantum dots:
+
+**Key Parameters:**
+- **Precursor ratio (Cu:In):** 0.8-1.2
+- **Temperature:** 180-220°C for core
+- **Time:** 60-120 minutes
+- **Shell growth:** 200-240°C with Zn precursor
+
+**For absorption ≥800nm:**
+- Increase In content
+- Extend reaction time
+- Grow thicker shells
+
+Would you like specific advice on any parameter?"""
+    
+    def get_porphyrin_response(self, query):
+        return """🧪 **Porphyrin Synthesis Advice**
+
+**Lindsey Method Recommendations:**
+- **Concentration:** 0.01-0.02 M
+- **Catalyst:** BF3·OEt2 (0.1-0.3 eq)
+- **Temperature:** Room temperature
+- **Oxidation:** DDQ or p-chloranil
+
+**For high singlet oxygen:**
+- Heavy atom substitution (Br, I)
+- Metalation with Pd or Pt
+- Extended conjugation
+
+Need help with a specific aspect?"""
+    
+    def get_optimization_response(self, query):
+        return """🚀 **Optimization Strategy**
+
+**Bayesian Optimization Workflow:**
+1. Define parameter space
+2. Build surrogate model (Gaussian Process)
+3. Use acquisition function (EI, UCB)
+4. Suggest next experiment
+5. Update model with results
+
+**Multi-objective tips:**
+- Use Pareto front analysis
+- Weighted sum for composite score
+- Consider trade-offs between properties
+
+Want me to elaborate on any step?"""
+    
+    def get_greeting(self):
+        return """👋 Hello! I'm your synthesis optimization assistant.
+
+I can help with:
+- **Quantum Dots** (CIS/ZnS optimization)
+- **Porphyrins** (synthesis & properties)
+- **Experimental Design** (DoE)
+- **Optimization** (Bayesian, multi-objective)
+
+What would you like to know?"""
+    
+    def get_general_response(self):
+        return """I'm here to help with synthesis optimization!
+
+You can ask me about:
+- Quantum dot synthesis conditions
+- Porphyrin synthesis methods
+- Design of experiments
+- Bayesian optimization
+- Data analysis
+
+What specific topic interests you?"""
 
 def display_deepseek_chatbox():
-    st.markdown("<h2 class='sub-header'>🤖 AI Assistant</h2>", unsafe_allow_html=True)
+    """Deepseek AI Assistant tab"""
+    st.markdown("<h2 class='sub-header'>🤖 Deepseek AI Assistant</h2>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class='info-box'>
+    Chat with Deepseek, your AI expert in quantum dot and porphyrin synthesis optimization.
+    Ask about synthesis conditions, experimental design, or data analysis!
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialize chatbot
     if 'chatbot' not in st.session_state:
         st.session_state.chatbot = DeepseekChatbot()
-        st.session_state.messages = [{"role":"assistant","content":"Hi! How can I help?"}]
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-    if prompt := st.chat_input("Ask about synthesis..."):
-        st.session_state.messages.append({"role":"user","content":prompt})
+    
+    if 'messages' not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "👋 Hello! I'm your synthesis optimization assistant. How can I help you today?"}
+        ]
+    
+    # Quick questions
+    st.markdown("### Quick Questions")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    quick_qs = [
+        "How to optimize QD absorption?",
+        "Best porphyrin synthesis?",
+        "What is Bayesian optimization?",
+        "How to improve singlet oxygen?"
+    ]
+    
+    for i, (col, q) in enumerate(zip([col1, col2, col3, col4], quick_qs)):
+        with col:
+            if st.button(q, use_container_width=True):
+                st.session_state.messages.append({"role": "user", "content": q})
+                response = st.session_state.chatbot.get_response(q)
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    # Display chat history
+    chat_container = st.container()
+    
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+    
+    # Chat input
+    if prompt := st.chat_input("Ask about synthesis optimization..."):
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        # Get response
         with st.chat_message("user"):
             st.markdown(prompt)
-        resp = st.session_state.chatbot.get_response(prompt)
-        st.session_state.messages.append({"role":"assistant","content":resp})
+        
         with st.chat_message("assistant"):
-            st.markdown(resp)
+            with st.spinner("Thinking..."):
+                response = st.session_state.chatbot.get_response(prompt)
+                st.markdown(response)
+        
+        st.session_state.messages.append({"role": "assistant", "content": response})
+    
+    # Clear chat button
+    if st.button("🗑️ Clear Chat"):
+        st.session_state.messages = [
+            {"role": "assistant", "content": "👋 Hello! I'm your synthesis optimization assistant. How can I help you today?"}
+        ]
+        st.rerun()
 
 # ============================================================================
 # Main
