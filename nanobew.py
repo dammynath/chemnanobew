@@ -399,7 +399,7 @@ def display_deepseek_chatbox():
     
     st.markdown("""
     <div class='info-box'>
-    Chat with Deepseek, your AI expert in quantum dot and porphyrin synthesis optimization.
+    Chat with CHEMNANOBOT, your AI expert in quantum dot and porphyrin synthesis optimization.
     Ask about synthesis conditions, experimental design, or data analysis!
     </div>
     """, unsafe_allow_html=True)
