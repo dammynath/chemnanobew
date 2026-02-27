@@ -394,8 +394,8 @@ You can ask me about:
 What specific topic interests you?"""
 
 def display_deepseek_chatbox():
-    """Deepseek AI Assistant tab"""
-    st.markdown("<h2 class='sub-header'>🤖 Deepseek AI Assistant</h2>", unsafe_allow_html=True)
+    """AI Assistant tab"""
+    st.markdown("<h2 class='sub-header'>🤖 AI Assistant</h2>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class='info-box'>
