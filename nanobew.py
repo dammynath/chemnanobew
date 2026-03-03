@@ -472,22 +472,7 @@ def display_multi_objective_tab():
 # ============================================================================
 # Tab: Molecular Generator (now using RDKit‑Mode MolecularUtils)
 # ============================================================================
-def display_molecular_generator_tab():
-    st.markdown("<h2 class='sub-header'>🎯 Porphyrin Generator with Optical Targets</h2>", unsafe_allow_html=True)
 
-    if not RDKIT_AVAILABLE:
-        st.warning("⚠️ RDKit not available – molecular visualization disabled, but property estimation works.")
-
-    utils = MolecularUtils()
-
-    # User inputs for target properties
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        target_abs = st.number_input("Target Absorbance (nm)", min_value=350, max_value=800, value=420, step=5)
-    with col2:
-        target_fluor = st.number_input("Target Fluorescence (nm)", min_value=500, max_value=900, value=650, step=5)
-    with col3:
-        target_qy = st.number_input("Target Quantum Yield", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
 #Update to the Porphyrin Generator
 # ============================================================================
 # Molecular Utilities with RDKit support and optical target scoring
@@ -611,40 +596,7 @@ class MolecularUtils:
             'qed': max(0, min(1, 0.3 + c*0.02 - n*0.01)),
         }
     # Update ends here
-    n_mols = st.slider("Number of candidates to generate", 5, 50, 10)
 
-    if st.button("🚀 Generate Porphyrin Candidates", use_container_width=True):
-        with st.spinner("Generating and scoring structures..."):
-            candidates = utils.generate_porphyrin_variants(
-                n=n_mols,
-                target_abs=target_abs,
-                target_fluor=target_fluor,
-                target_qy=target_qy
-            )
-
-        if not candidates:
-            st.warning("No candidates found. Try adjusting targets.")
-        else:
-            st.success(f"✅ Generated {len(candidates)} candidate structures")
-
-            # Display each candidate
-            for i, (smi, abs_wl, fluor_wl, qy) in enumerate(candidates):
-                with st.expander(f"Molecule {i+1}"):
-                    col_a, col_b = st.columns([1, 1])
-                    with col_a:
-                        st.code(smi, language="text")
-                        if RDKIT_AVAILABLE:
-                            from rdkit import Chem
-                            from rdkit.Chem import Draw
-                            mol = Chem.MolFromSmiles(smi)
-                            if mol:
-                                img = Draw.MolToImage(mol, size=(250, 250))
-                                st.image(img, caption="2D Structure")
-                    with col_b:
-                        st.markdown("**Estimated Properties**")
-                        st.metric("Absorbance (nm)", f"{abs_wl:.1f}")
-                        st.metric("Fluorescence (nm)", f"{fluor_wl:.1f}")
-                        st.metric("Quantum Yield", f"{qy:.3f}")
 
     # --- DoE Experiment Suggestion Section ---
     st.markdown("---")
