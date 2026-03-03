@@ -1,5 +1,5 @@
 """
-chemnanobew_app.py – Synthesis Optimization Suite (RDKit‑free)
+chemnanobew_app.py – Synthesis Optimization Suite (RDKit‑Mode)
 Deploy on Streamlit Cloud with no RDKit dependency.
 """
 
@@ -210,7 +210,7 @@ class DataManager:
         })
 
 # ============================================================================
-# Molecular utilities – RDKit‑free fallback
+# Molecular utilities – RDKit‑Mode fallback
 # ============================================================================
 class MolecularUtils:
     """Simplified molecular handling without RDKit."""
@@ -470,7 +470,7 @@ def display_multi_objective_tab():
         st.plotly_chart(fig)
 
 # ============================================================================
-# Tab: Molecular Generator (now using RDKit‑free MolecularUtils)
+# Tab: Molecular Generator (now using RDKit‑Mode MolecularUtils)
 # ============================================================================
 def display_molecular_generator_tab():
     st.markdown("<h2 class='sub-header'>Porphyrin Generator</h2>", unsafe_allow_html=True)
@@ -677,7 +677,7 @@ def main():
                 st.rerun()
         uploaded_file = st.file_uploader("Upload CSV", type=['csv'])
         st.markdown("---")
-        st.info("CHEM‑NANO‑BEW Lab • v2.1 (RDKit‑free)")
+        st.info("CHEM‑NANO‑BEW Lab • v2.1 (RDKit‑Mode)")
 
     st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
     st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
@@ -693,7 +693,7 @@ def main():
     else:
         display_deepseek_chatbox()
 
-    st.markdown("<div class='footer'>Powered by CHEMNANOBEW GROUP • RDKit‑free version</div>", unsafe_allow_html=True)
+    st.markdown("<div class='footer'>Powered by CHEMNANOBEW GROUP • RDKit‑Mode version</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
