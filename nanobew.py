@@ -389,15 +389,7 @@ def display_porphyrins_tab(uploaded_file):
             pred = 45 + (temp-80)*0.1 + (time_r-720)*0.01 + cat_conc*100
             pred = max(10, min(85, pred))
             st.success(f"Predicted yield: {pred:.1f}%")
-   def display_porphyrins_tab(uploaded_file):
-    st.markdown("<h2 class='sub-header'>Porphyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
-    data = uploaded_file and DataManager.load_data(uploaded_file) or DataManager.create_sample_porphyrin_data(50)
-    if data is None:
-        return
-
-    tab1, tab2, tab3 = st.tabs(["📊 Data Explorer", "🔬 Synthesis Optimization", "🧪 Property Prediction"])
-
-     with tab3:
+    with tab3:
         st.markdown("### 🔮 Property Prediction with RDKit")
         smiles = st.text_input(
             "Enter SMILES string",
