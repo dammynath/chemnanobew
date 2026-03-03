@@ -22,7 +22,13 @@ try:
     HAS_OPTUNA = True
 except:
     HAS_OPTUNA = False
-
+try:
+    from rdkit import Chem
+    from rdkit.Chem import Descriptors, rdMolDescriptors
+    RDKIT_AVAILABLE = True
+except ImportError:
+    RDKIT_AVAILABLE = False
+    st.warning("⚠️ RDKit not installed – using simplified property estimation.")
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.preprocessing import StandardScaler
@@ -383,25 +389,64 @@ def display_porphyrins_tab(uploaded_file):
             pred = 45 + (temp-80)*0.1 + (time_r-720)*0.01 + cat_conc*100
             pred = max(10, min(85, pred))
             st.success(f"Predicted yield: {pred:.1f}%")
-    with tab3: #Modified for RDKit
-        smiles = st.text_input("Enter SMILES", "C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2")
-        if st.button("Calculate Properties"):
-            props = MolecularUtils.estimate_properties(smiles)
-            if props:
-                for k,v in props.items():
-                    st.metric(k.replace('_',' ').title(), v)
+   def display_porphyrins_tab(uploaded_file):
+    st.markdown("<h2 class='sub-header'>Porphyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
+    data = uploaded_file and DataManager.load_data(uploaded_file) or DataManager.create_sample_porphyrin_data(50)
+    if data is None:
+        return
+
+    tab1, tab2, tab3 = st.tabs(["📊 Data Explorer", "🔬 Synthesis Optimization", "🧪 Property Prediction"])
+
+     with tab3:
+        st.markdown("### 🔮 Property Prediction with RDKit")
+        smiles = st.text_input(
+            "Enter SMILES string",
+            value="C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2",
+            help="Simplified Molecular Input Line Entry System"
+        )
+
+        if st.button("Calculate Properties", type="primary"):
+            if RDKIT_AVAILABLE:
+                try:
+                    from rdkit import Chem
+                    from rdkit.Chem import Descriptors
+                    mol = Chem.MolFromSmiles(smiles)
+                    if mol:
+                        props = {
+                            "Molecular Weight": f"{Descriptors.MolWt(mol):.2f} g/mol",
+                            "LogP": f"{Descriptors.MolLogP(mol):.3f}",
+                            "HBA": Descriptors.NumHAcceptors(mol),
+                            "HBD": Descriptors.NumHDonors(mol),
+                            "Rotatable Bonds": Descriptors.NumRotatableBonds(mol),
+                            "TPSA": f"{Descriptors.TPSA(mol):.2f} Å²",
+                            "QED (Drug-likeness)": f"{Descriptors.qed(mol):.3f}",
+                            "Heavy Atoms": mol.GetNumHeavyAtoms(),
+                            "Rings": Chem.rdMolDescriptors.CalcNumRings(mol)
+                        }
+                        # Display in columns
+                        cols = st.columns(3)
+                        items = list(props.items())
+                        for i, (key, val) in enumerate(items):
+                            cols[i % 3].metric(key, val)
+                    else:
+                        st.error("❌ Invalid SMILES string. Please check the format.")
+                except Exception as e:
+                    st.error(f"RDKit calculation failed: {e}")
+                    # Fallback to estimation
+                    st.info("Falling back to estimated properties...")
+                    props = MolecularUtils.estimate_properties(smiles)
+                    if props:
+                        for k, v in props.items():
+                            st.metric(k.replace('_', ' ').title(), v)
             else:
-                st.error("Invalid SMILES")
-        if st.button("Calculate Properties"):
-            st.info("Property calculation would be performed here with RDKit")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Molecular Weight", "614.7 g/mol")
-            with col2:
-                st.metric("LogP", "4.2")
-            with col3:
-                st.metric("QED (Drug-likeness)", "0.68")
+                # RDKit not installed – use estimation
+                props = MolecularUtils.estimate_properties(smiles)
+                if props:
+                    st.info("RDKit not available – showing estimated properties.")
+                    for k, v in props.items():
+                        st.metric(k.replace('_', ' ').title(), v)
+                else:
+                    st.error("❌ Invalid SMILES string")
 
 
 # ============================================================================
