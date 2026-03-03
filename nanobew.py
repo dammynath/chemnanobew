@@ -473,19 +473,104 @@ def display_multi_objective_tab():
 # Tab: Molecular Generator (now using RDKit‑Mode MolecularUtils)
 # ============================================================================
 def display_molecular_generator_tab():
-    st.markdown("<h2 class='sub-header'>Porphyrin Generator</h2>", unsafe_allow_html=True)
-    st.info("RDKit not available – showing SMILES and estimated properties only.")
-    n_mols = st.slider("Number of molecules", 5, 20, 10)
-    if st.button("Generate"):
-        utils = MolecularUtils()
-        smiles_list = utils.generate_porphyrin_variants(n_mols)
-        for i, smi in enumerate(smiles_list):
-            with st.expander(f"Molecule {i+1}"):
-                st.code(smi)
-                props = utils.estimate_properties(smi)
-                if props:
-                    for k,v in props.items():
-                        st.text(f"{k}: {v}")
+    st.markdown("<h2 class='sub-header'>🎯 Porphyrin Generator with Optical Targets</h2>", unsafe_allow_html=True)
+
+    if not RDKIT_AVAILABLE:
+        st.warning("⚠️ RDKit not available – molecular visualization disabled, but property estimation works.")
+
+    utils = MolecularUtils()
+
+    # User inputs for target properties
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        target_abs = st.number_input("Target Absorbance (nm)", min_value=350, max_value=800, value=420, step=5)
+    with col2:
+        target_fluor = st.number_input("Target Fluorescence (nm)", min_value=500, max_value=900, value=650, step=5)
+    with col3:
+        target_qy = st.number_input("Target Quantum Yield", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+
+    n_mols = st.slider("Number of candidates to generate", 5, 50, 10)
+
+    if st.button("🚀 Generate Porphyrin Candidates", use_container_width=True):
+        with st.spinner("Generating and scoring structures..."):
+            candidates = utils.generate_porphyrin_variants(
+                n=n_mols,
+                target_abs=target_abs,
+                target_fluor=target_fluor,
+                target_qy=target_qy
+            )
+
+        if not candidates:
+            st.warning("No candidates found. Try adjusting targets.")
+        else:
+            st.success(f"✅ Generated {len(candidates)} candidate structures")
+
+            # Display each candidate
+            for i, (smi, abs_wl, fluor_wl, qy) in enumerate(candidates):
+                with st.expander(f"Molecule {i+1}"):
+                    col_a, col_b = st.columns([1, 1])
+                    with col_a:
+                        st.code(smi, language="text")
+                        if RDKIT_AVAILABLE:
+                            from rdkit import Chem
+                            from rdkit.Chem import Draw
+                            mol = Chem.MolFromSmiles(smi)
+                            if mol:
+                                img = Draw.MolToImage(mol, size=(250, 250))
+                                st.image(img, caption="2D Structure")
+                    with col_b:
+                        st.markdown("**Estimated Properties**")
+                        st.metric("Absorbance (nm)", f"{abs_wl:.1f}")
+                        st.metric("Fluorescence (nm)", f"{fluor_wl:.1f}")
+                        st.metric("Quantum Yield", f"{qy:.3f}")
+
+    # --- DoE Experiment Suggestion Section ---
+    st.markdown("---")
+    st.markdown("<h3 class='sub-header'>🔬 DoE: Next 10 Experiments</h3>", unsafe_allow_html=True)
+
+    # Use uploaded CSV if available, otherwise sample data
+    data = None
+    if 'uploaded_file' in st.session_state and st.session_state.uploaded_file:
+        data = DataManager.load_data(st.session_state.uploaded_file)
+    if data is None:
+        data = DataManager.create_sample_porphyrin_data(50)
+        st.info("Using sample porphyrin data. Upload your own CSV for real DoE.")
+
+    # Simple DoE suggestion: space‑filling design over key factors
+    st.markdown("Based on current data, recommended next experiments (Latin Hypercube sampling):")
+
+    # Extract numeric factors (excluding target properties)
+    exclude = ['yield_percent', 'purity_percent', 'singlet_oxygen_au', 'fluorescence_qy']
+    factors = [c for c in data.columns if c not in exclude and data[c].dtype in ['float64', 'int64']]
+
+    if len(factors) >= 2:
+        from scipy.stats import qmc
+        sampler = qmc.LatinHypercube(d=len(factors))
+        sample = sampler.random(n=10)
+        # Scale to factor ranges
+        scaled = pd.DataFrame(
+            qmc.scale(sample,
+                      [data[f].min() for f in factors],
+                      [data[f].max() for f in factors]),
+            columns=factors
+        )
+        st.dataframe(scaled, use_container_width=True)
+
+        # Optional: build a simple model to predict yield and suggest conditions that maximize it
+        if st.button("🎯 Suggest conditions to maximize yield"):
+            from sklearn.ensemble import RandomForestRegressor
+            X = data[factors]
+            y = data['yield_percent']
+            model = RandomForestRegressor(n_estimators=50, random_state=42)
+            model.fit(X, y)
+            # Predict on the 10 candidates
+            preds = model.predict(scaled)
+            best_idx = np.argmax(preds)
+            st.success(f"Best predicted yield: {preds[best_idx]:.1f}%")
+            st.write("Optimal conditions:")
+            st.json(scaled.iloc[best_idx].to_dict())
+    else:
+        st.warning("Not enough numeric factors for DoE.")
 
 # ============================================================================
 # Tab: Deepseek AI Assistant (unchanged)
