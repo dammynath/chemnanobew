@@ -179,7 +179,7 @@ def display_quantum_dots_tab(uploaded_file):
         st.error("No data available")
         return
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Data Explorer", "🔬 Optimization", "📈 Visualization", "📥 Export"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Data Explorer", "🔬 Optimization", "📈 Visualization", "👨‍🔬CIS-Te/ZnS Optimizer", "📥 Export"])
     with tab1:
         col1, col2 = st.columns([2,1])
         with col1:
@@ -206,7 +206,57 @@ def display_quantum_dots_tab(uploaded_file):
             y = st.selectbox("Y axis", num_cols, index=min(1,len(num_cols)-1))
             fig = px.scatter(data, x=x, y=y, trendline="lowess")
             st.plotly_chart(fig)
-    with tab4:
+    with tab4: # CIS-Te/ZnS Optimizer
+
+        st.header("CIS-Te/ZnS Optimizer")
+
+        pH = st.slider("pH",2.5,6.0,(3.0,5.0))
+        Te = st.slider("Te (g)",0.0012,0.0022,(0.0016,0.0020))
+        Zn = st.slider("ZnAc (g)",0.02,0.04,(0.025,0.035))
+        shell = st.slider("Shell time",10,60,(15,45))
+
+        ranges={
+            "pH":pH,
+            "Te":Te,
+            "Zn":Zn,
+            "shell":shell
+        }
+
+        uploaded = st.file_uploader("Upload experimental CSV", type="csv")
+
+        if uploaded:
+            df = pd.read_csv(uploaded)
+            st.success("Using real data")
+        else:
+            df = generate_doe(ranges,40)
+            df["wavelength"]=720+250*df["Te"]+0.4*df["shell"]
+            df["intensity"]=15000+5000*(df["pH"]-4)
+
+        st.dataframe(df)
+
+        model=train_rf(df,["wavelength","intensity"])
+
+        if st.button("Run Bayesian Optimization"):
+            best = bayes_optimize(model,ranges,["wavelength","intensity"])
+            st.success(best)
+
+        if st.button("Show Pareto Front"):
+            pf=pareto_front(df,["wavelength","intensity"])
+            fig=px.scatter(df,x="wavelength",y="intensity")
+            fig.add_scatter(x=pf["wavelength"],y=pf["intensity"],mode="markers")
+            st.plotly_chart(fig)
+
+        if st.button("RL Suggest Next Experiment"):
+            hist=df.copy()
+            hist["reward"]=hist["wavelength"]+hist["intensity"]/1000
+            st.write(rl_suggest(hist,ranges))
+
+    if HAS_OPTUNA:
+        best = bayes_optimize(model,ranges)
+    else:
+        st.warning("Optuna not installed — using random search instead")
+        best = generate_doe(ranges,1000).iloc[0]
+    with tab5:
         csv = data.to_csv(index=False)
         st.download_button("Download CSV", csv, "qd_data.csv", "text/csv")
 
