@@ -472,131 +472,62 @@ def display_multi_objective_tab():
 # ============================================================================
 # Tab: Molecular Generator (now using RDKit‑Mode MolecularUtils)
 # ============================================================================
+# def display_molecular_generator_tab():
+#   st.markdown("<h2 class='sub-header'>🎯 Porphyrin Generator with Optical Targets</h2>", unsafe_allow_html=True)
+#
+#    if not RDKIT_AVAILABLE:
+#        st.warning("⚠️ RDKit not available – molecular visualization disabled, but property estimation works.")
 
-#Update to the Porphyrin Generator
-# ============================================================================
-# Molecular Utilities with RDKit support and optical target scoring
-# ============================================================================
-class MolecularUtils:
-    def __init__(self):
-        self.rdkit = RDKIT_AVAILABLE
-        # Base porphyrin core (free base)
-        self.core_smiles = "C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2"
-        # Predefined substituent effects (Δλ in nm, ΔQY relative)
-        # These are rough estimates based on literature
-        self.substituents = {
-            "H": {"smiles": "", "delta_abs": 0, "delta_fluor": 0, "delta_qy": 0.0, "name": "Unsubstituted"},
-            "Br": {"smiles": "Br", "delta_abs": 15, "delta_fluor": 10, "delta_qy": -0.02, "name": "Bromo"},
-            "Cl": {"smiles": "Cl", "delta_abs": 8, "delta_fluor": 5, "delta_qy": -0.01, "name": "Chloro"},
-            "I": {"smiles": "I", "delta_abs": 25, "delta_fluor": 20, "delta_qy": -0.05, "name": "Iodo"},
-            "F": {"smiles": "F", "delta_abs": -5, "delta_fluor": -8, "delta_qy": 0.01, "name": "Fluoro"},
-            "OMe": {"smiles": "OC", "delta_abs": 20, "delta_fluor": 15, "delta_qy": 0.03, "name": "Methoxy"},
-            "Me": {"smiles": "C", "delta_abs": 5, "delta_fluor": 3, "delta_qy": 0.01, "name": "Methyl"},
-            "NO2": {"smiles": "N(=O)=O", "delta_abs": -20, "delta_fluor": -25, "delta_qy": -0.10, "name": "Nitro"},
-            "NH2": {"smiles": "N", "delta_abs": 30, "delta_fluor": 25, "delta_qy": 0.08, "name": "Amino"},
-            "Ph": {"smiles": "c1ccccc1", "delta_abs": 10, "delta_fluor": 8, "delta_qy": 0.02, "name": "Phenyl"},
-        }
-        # Base optical properties of unsubstituted porphyrin (approx.)
-        self.base_abs = 410      # Soret band (nm)
-        self.base_fluor = 630    # Fluorescence peak (nm)
-        self.base_qy = 0.12      # Quantum yield
+def display_molecular_generator_tab():
+    st.markdown("<h2 class='sub-header'>🎯 Porphyrin Generator with Optical Targets</h2>", unsafe_allow_html=True)
 
-        # Pre‑enumerated derivatives (used if RDKit not available or as fallback)
-        self.known_porphyrins = [
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2", "Unsubstituted"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(Br)=N5)C=C2", "Bromo"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(Cl)=N5)C=C2", "Chloro"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(I)=N5)C=C2", "Iodo"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(F)=N5)C=C2", "Fluoro"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(OC)=N5)C=C2", "Methoxy"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(C)=N5)C=C2", "Methyl"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(N)=N5)C=C2", "Amino"),
-            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(c6ccccc6)=N5)C=C2", "Phenyl"),
-        ]
+    if not RDKIT_AVAILABLE:
+        st.warning("⚠️ RDKit not available – molecular visualization disabled, but property estimation works.") 
+    utils = MolecularUtils()
 
-    def estimate_optical_properties(self, smiles):
-        """
-        Estimate absorbance, fluorescence, and quantum yield from SMILES.
-        If RDKit is available, we can parse substituents; otherwise use predefined mapping.
-        """
-        # For simplicity, we'll use a lookup table based on the known derivatives.
-        # In a real app, you'd parse the SMILES to identify substituents and apply delta rules.
-        for smi, name in self.known_porphyrins:
-            if smi == smiles:
-                # Use substituent deltas based on name
-                for key, sub in self.substituents.items():
-                    if sub["name"] == name:
-                        abs_wl = self.base_abs + sub["delta_abs"]
-                        fluor_wl = self.base_fluor + sub["delta_fluor"]
-                        qy = self.base_qy + sub["delta_qy"]
-                        return abs_wl, fluor_wl, qy
-        # If not found, return random variations around base (fallback)
-        return (self.base_abs + np.random.normal(0, 20),
-                self.base_fluor + np.random.normal(0, 30),
-                max(0, min(1, self.base_qy + np.random.normal(0, 0.05))))
+    # User inputs for target properties
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        target_abs = st.number_input("Target Absorbance (nm)", min_value=350, max_value=800, value=420, step=5)
+    with col2:
+        target_fluor = st.number_input("Target Fluorescence (nm)", min_value=500, max_value=900, value=650, step=5)
+    with col3:
+        target_qy = st.number_input("Target Quantum Yield", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
 
-    def generate_porphyrin_variants(self, n=10, target_abs=None, target_fluor=None, target_qy=None):
-        """
-        Generate n porphyrin SMILES strings, optionally scoring against optical targets.
-        Returns list of tuples (smiles, abs_wl, fluor_wl, qy).
-        """
-        candidates = []
-        # Use the predefined list as our "generated" molecules (for simplicity)
-        base_list = [smi for smi, _ in self.known_porphyrins]
+    n_mols = st.slider("Number of candidates to generate", 5, 50, 10)
 
-        # Score each candidate based on how close its estimated properties are to targets
-        scored = []
-        for smi in base_list:
-            abs_wl, fluor_wl, qy = self.estimate_optical_properties(smi)
-            score = 0.0
-            if target_abs is not None:
-                score -= abs(abs_wl - target_abs) / 50.0  # normalize
-            if target_fluor is not None:
-                score -= abs(fluor_wl - target_fluor) / 50.0
-            if target_qy is not None:
-                score -= abs(qy - target_qy) * 10.0  # QY is 0-1, so scale
-            scored.append((smi, score, abs_wl, fluor_wl, qy))
+    if st.button("🚀 Generate Porphyrin Candidates", use_container_width=True):
+        with st.spinner("Generating and scoring structures..."):
+            candidates = utils.generate_porphyrin_variants(
+                n=n_mols,
+                target_abs=target_abs,
+                target_fluor=target_fluor,
+                target_qy=target_qy
+            )
 
-        # Sort by score (higher is better) and take top n
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return [(smi, abs_wl, fluor_wl, qy) for smi, _, abs_wl, fluor_wl, qy in scored[:n]]
+        if not candidates:
+            st.warning("No candidates found. Try adjusting targets.")
+        else:
+            st.success(f"✅ Generated {len(candidates)} candidate structures")
 
-    def estimate_properties(self, smiles):
-        """Return general molecular properties (MW, LogP, etc.) – fallback without RDKit."""
-        # This method should already exist in your code; if not, add a simple version.
-        # We'll reuse the one from earlier.
-        if self.rdkit:
-            try:
-                from rdkit import Chem
-                from rdkit.Chem import Descriptors
-                mol = Chem.MolFromSmiles(smiles)
-                if mol:
-                    return {
-                        'molecular_weight': Descriptors.MolWt(mol),
-                        'logP': Descriptors.MolLogP(mol),
-                        'hba': Descriptors.NumHAcceptors(mol),
-                        'hbd': Descriptors.NumHDonors(mol),
-                        'rotatable_bonds': Descriptors.NumRotatableBonds(mol),
-                        'tpsa': Descriptors.TPSA(mol),
-                        'qed': Descriptors.qed(mol),
-                    }
-            except:
-                pass
-        # Fallback estimation
-        c = smiles.lower().count('c')
-        n = smiles.lower().count('n')
-        o = smiles.lower().count('o')
-        return {
-            'molecular_weight': c*12 + n*14 + o*16 + 50,
-            'logP': -2 + c*0.3 - n*0.2,
-            'hba': n + o,
-            'hbd': smiles.lower().count('oh'),
-            'rotatable_bonds': smiles.count('=') // 2,
-            'tpsa': (n+o)*12,
-            'qed': max(0, min(1, 0.3 + c*0.02 - n*0.01)),
-        }
-    # Update ends here
-
+            # Display each candidate
+            for i, (smi, abs_wl, fluor_wl, qy) in enumerate(candidates):
+                with st.expander(f"Molecule {i+1}"):
+                    col_a, col_b = st.columns([1, 1])
+                    with col_a:
+                        st.code(smi, language="text")
+                        if RDKIT_AVAILABLE:
+                            from rdkit import Chem
+                            from rdkit.Chem import Draw
+                            mol = Chem.MolFromSmiles(smi)
+                            if mol:
+                                img = Draw.MolToImage(mol, size=(250, 250))
+                                st.image(img, caption="2D Structure")
+                    with col_b:
+                        st.markdown("**Estimated Properties**")
+                        st.metric("Absorbance (nm)", f"{abs_wl:.1f}")
+                        st.metric("Fluorescence (nm)", f"{fluor_wl:.1f}")
+                        st.metric("Quantum Yield", f"{qy:.3f}")
 
     # --- DoE Experiment Suggestion Section ---
     st.markdown("---")
@@ -647,10 +578,10 @@ class MolecularUtils:
         st.warning("Not enough numeric factors for DoE.")
 
 # ============================================================================
-# Tab: Deepseek AI Assistant (unchanged)
+# Tab: AI Assistant (unchanged)
 # ============================================================================
 # ============================================================================
-# DEEPSEEK CHATBOX TAB
+# AI CHATBOX TAB
 # ============================================================================
 
 class DeepseekChatbot:
