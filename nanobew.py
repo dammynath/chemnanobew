@@ -17,6 +17,15 @@ import time
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
+try:
+    import optuna
+    HAS_OPTUNA = True
+except:
+    HAS_OPTUNA = False
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.preprocessing import StandardScaler
 
 # ============================================================================
 # Page config (must be first)
@@ -56,6 +65,95 @@ def save_uploaded_image(uploaded_file):
             f.write(uploaded_file.getbuffer())
         return path
     return None
+def generate_doe(ranges, n=30):
+    data = {}
+    for k,(lo,hi) in ranges.items():
+        data[k] = np.random.uniform(lo,hi,n)
+    return pd.DataFrame(data)
+
+
+def train_rf(df, targets):
+    X = df.drop(columns=targets)
+    y = df[targets]
+    model = MultiOutputRegressor(RandomForestRegressor(n_estimators=300))
+    model.fit(X,y)
+    return model
+
+
+###############################################################
+# PARETO FRONT
+###############################################################
+
+def pareto_front(df, cols):
+    data = df[cols].values
+    mask = np.ones(len(data), dtype=bool)
+
+    for i,c in enumerate(data):
+        if mask[i]:
+            mask[mask] = np.any(data[mask] > c, axis=1)
+            mask[i]=True
+    return df[mask]
+
+
+###############################################################
+# BAYESIAN OPTIMIZATION
+###############################################################
+
+def bayes_optimize(model, ranges, targets=["wavelength","intensity"]):
+
+    def objective(trial):
+        x=[]
+        for k,(lo,hi) in ranges.items():
+            x.append(trial.suggest_float(k, lo, hi))
+        x=np.array(x).reshape(1,-1)
+
+        pred = model.predict(x)[0]
+
+        score = pred[0] + pred[1]/1000
+        return score
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=50)
+
+    return study.best_params
+
+
+###############################################################
+# REINFORCEMENT LOOP (simple epsilon-greedy)
+###############################################################
+
+def rl_suggest(history, ranges, eps=0.2):
+
+    if len(history)<5 or np.random.rand()<eps:
+        return {k:np.random.uniform(lo,hi) for k,(lo,hi) in ranges.items()}
+
+    best = history.sort_values("reward", ascending=False).iloc[0]
+    suggestion={}
+    for k,(lo,hi) in ranges.items():
+        suggestion[k] = np.clip(best[k] + np.random.normal(0,(hi-lo)*0.1),lo,hi)
+    return suggestion
+
+
+###############################################################
+# PORPHYRIN GENERATOR (RDKit)
+###############################################################
+
+def generate_porhyrin_smiles(subs):
+
+    base = "c1cc2ccc3ccc4ccc(c1)c2c3c4"  # simplified macrocycle scaffold
+    smiles=[]
+    for s in subs:
+        smiles.append(base + s)
+    return smiles
+
+
+###############################################################
+# GNN PLACEHOLDER (feature-based mock) CHEMNANOBEW_RUN ENDS
+###############################################################
+
+def gnn_predict(features):
+    # lightweight surrogate until real PyG model plugged in
+    return np.sum(features,axis=1)*0.5 + 700
 
 # ============================================================================
 # DataManager (unchanged)
