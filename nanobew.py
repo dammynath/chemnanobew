@@ -1995,7 +1995,7 @@ def main():
         else:
             st.markdown("<div class='sidebar-logo'><div style='font-size:3rem;'>🧪</div><div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div></div>", unsafe_allow_html=True)
         st.markdown("---")
-        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator", "📊 Advanced Visualization", "AI Assistant"])
+        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator","📊 Advanced Visualization","AI Assistant"])
         with st.expander("Upload Logo"):
             logo = st.file_uploader("Image", type=['png','jpg','jpeg','gif'])
             if logo:
@@ -2016,7 +2016,7 @@ def main():
         display_multi_objective_tab()
     elif mode == "Molecular Generator":
         display_molecular_generator_tab()
-    elif mode == "Advanced Visualization":
+    elif mode == "📊 Advanced Visualization":
         display_advanced_visualization(uploaded_file)
     else:
         display_deepseek_chatbox()
