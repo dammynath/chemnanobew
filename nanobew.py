@@ -289,7 +289,7 @@ else:
     st.info("📊 Using sample data. Upload your own CSV for real optimization.")
     if data is None:
         st.error("No data available")
-    return
+       return
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Data Explorer", "🔬 Optimization", "📈 Visualization", "👨‍🔬CIS-Te/ZnS Optimizer", "📥 Export"])
     with tab1:
