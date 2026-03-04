@@ -2167,7 +2167,7 @@ class AIResearchAssistant:
         enhanced_query = f"{query} porphyrin synthesis photodynamic therapy"
         return self.search_all(enhanced_query)
     
-    # ========================================================================
+   # ========================================================================
     # UI Rendering
     # ========================================================================
     def render_ui(self):
@@ -2218,36 +2218,152 @@ class AIResearchAssistant:
                 OPENAI_API_KEY = "sk-..."
                 BRAVE_API_KEY = "BSA..."
                 TAVILY_API_KEY = "tvly-..."
+                """)
+
+st.markdown("---")
+
+Search mode selector
+search_mode = st.radio(
+"Search Mode",
+["General Research", "Quantum Dots", "Porphyrins", "Chemistry Literature"],
+horizontal=True,
+key="search_mode"
+)
+
+Display chat history
+for message in st.session_state.assistant_messages:
+with st.chat_message(message["role"]):
+st.markdown(message["content"])
+if "sources" in message and message["sources"]:
+with st.expander(f"📚 Sources ({len(message['sources'])})"):
+for src in message["sources"]:
+title = src.get('title', src.get('url', 'Source'))
+url = src.get('url', '#')
+provider = src.get('provider', 'web')
+st.markdown(f"- {title} ({provider})")
+
+Chat input
+if prompt := st.chat_input("Ask about synthesis, research, or any topic..."):
+
+Add user message
+st.session_state.assistant_messages.append({"role": "user", "content": prompt})
+with st.chat_message("user"):
+st.markdown(prompt)
+
+Generate response
+with st.chat_message("assistant"):
+with st.spinner("🔍 Searching Brave & Tavily..."):
+
+Select search mode
+if search_mode == "Quantum Dots":
+search_results = self.search_qd_synthesis(prompt)
+elif search_mode == "Porphyrins":
+search_results = self.search_porphyrin_synthesis(prompt)
+elif search_mode == "Chemistry Literature":
+search_results = self.search_chemistry_literature(prompt)
+else:
+search_results = self.search_all(prompt)
+
+Generate AI response
+with st.spinner("🧠 Thinking..."):
+response = self.generate_response(prompt, search_results)
+st.markdown(response)
+
+Show sources
+if search_results['sources']:
+with st.expander(f"📚 Sources ({len(search_results['sources'])})"):
+for src in search_results['sources'][:5]: # Show top 5
+title = src.get('title', src.get('url', 'Source'))
+url = src.get('url', '#')
+provider = src.get('provider', 'web')
+st.markdown(f"- {title} ({provider})")
+
+if len(search_results['sources']) > 5:
+st.caption(f"... and {len(search_results['sources']) - 5} more sources")
+
+Save to session
+st.session_state.assistant_messages.append({
+"role": "assistant",
+"content": response,
+"sources": search_results['sources'][:10]
+})
+
+Sidebar with search history
+with st.sidebar.expander("📜 Search History", expanded=False):
+for i, msg in enumerate(st.session_state.assistant_messages[-10:]):
+if msg["role"] == "user":
+st.markdown(f"Q{i}: {msg['content'][:50]}...")
+
+if st.button("Clear Chat"):
+st.session_state.assistant_messages = []
+st.rerun()
+
 # ============================================================================
 # Tab: AI Assistant (unchanged)
 # ============================================================================
+
+
 # ============================================================================
-# AI CHATBOX TAB
+# AI CHATBOX TAB - FIXED VERSION
 # ============================================================================
 
-class DeepseekChatbot:
-    """Simple chatbot for synthesis advice"""
+class ChemNanoBot:
+    """Enhanced chatbot for synthesis advice"""
     
     def __init__(self):
         self.conversation_history = []
+        self.context_window = []  # Store last 5 exchanges for context
     
     def get_response(self, user_message):
-        """Generate response based on user message"""
+        """Generate response based on user message with context awareness"""
         user_message_lower = user_message.lower()
         
-        if 'quantum dot' in user_message_lower or 'qd' in user_message_lower:
-            return self.get_qd_response(user_message)
+        # Store in context
+        self.context_window.append({"role": "user", "content": user_message})
+        if len(self.context_window) > 10:
+            self.context_window = self.context_window[-10:]
+        
+        # Check for context-aware responses
+        if len(self.context_window) > 2:
+            # Look for follow-up questions
+            if "more" in user_message_lower or "elaborate" in user_message_lower:
+                return self.get_elaboration_response()
+        
+        # Route to appropriate response
+        if any(word in user_message_lower for word in ['quantum dot', 'qd', 'cis/zns']):
+            response = self.get_qd_response(user_message)
         elif 'porphyrin' in user_message_lower:
-            return self.get_porphyrin_response(user_message)
-        elif 'optimiz' in user_message_lower:
-            return self.get_optimization_response(user_message)
-        elif 'hello' in user_message_lower or 'hi' in user_message_lower:
-            return self.get_greeting()
+            response = self.get_porphyrin_response(user_message)
+        elif any(word in user_message_lower for word in ['optimiz', 'bayesian', 'pareto']):
+            response = self.get_optimization_response(user_message)
+        elif any(word in user_message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
+            response = self.get_greeting()
+        elif any(word in user_message_lower for word in ['thank', 'thanks']):
+            response = self.get_thanks_response()
         else:
-            return self.get_general_response()
+            response = self.get_general_response()
+        
+        # Store response in context
+        self.context_window.append({"role": "assistant", "content": response})
+        
+        return response
+    
+    def get_elaboration_response(self):
+        """Provide elaboration on previous topic"""
+        return """📚 **Let me elaborate further...**
+
+Based on our conversation, here's additional detail:
+
+**Key Points to Remember:**
+1. Temperature control is critical - maintain ±2°C
+2. Precursor purity affects final quality - use >99.9%
+3. Reaction monitoring via UV-Vis helps track growth
+4. Shell growth requires careful rate control
+
+Would you like me to dive deeper into any specific aspect?"""
     
     def get_qd_response(self, query):
-        return """**Quantum Dot Synthesis Advice**
+        return """🎯 **Quantum Dot Synthesis Advice**
 
 For optimal CIS/ZnS quantum dots:
 
@@ -2258,9 +2374,14 @@ For optimal CIS/ZnS quantum dots:
 - **Shell growth:** 200-240°C with Zn precursor
 
 **For absorption ≥800nm:**
-- Increase In content
-- Extend reaction time
-- Grow thicker shells
+- Increase In content (ratio >1.2)
+- Extend reaction time (90-120 min)
+- Grow 3-5 monolayers of ZnS shell
+
+**For high PLQY (>60%):**
+- Use coordinating solvents (oleylamine, TOP)
+- Optimize shell coverage
+- Purify via size-selective precipitation
 
 Would you like specific advice on any parameter?"""
     
@@ -2272,11 +2393,19 @@ Would you like specific advice on any parameter?"""
 - **Catalyst:** BF3·OEt2 (0.1-0.3 eq)
 - **Temperature:** Room temperature
 - **Oxidation:** DDQ or p-chloranil
+- **Yield:** 30-50% possible
+
+**Adler-Long Method:**
+- **Concentration:** 0.05-0.1 M
+- **Temperature:** Reflux in propionic acid (~140°C)
+- **Time:** 30-60 minutes
+- **Yield:** 15-30%
 
 **For high singlet oxygen:**
 - Heavy atom substitution (Br, I)
 - Metalation with Pd or Pt
 - Extended conjugation
+- Push-pull architecture
 
 Need help with a specific aspect?"""
     
@@ -2284,111 +2413,280 @@ Need help with a specific aspect?"""
         return """🚀 **Optimization Strategy**
 
 **Bayesian Optimization Workflow:**
-1. Define parameter space
+1. Define parameter space (5-10 factors)
 2. Build surrogate model (Gaussian Process)
-3. Use acquisition function (EI, UCB)
+3. Use acquisition function (EI, UCB, PI)
 4. Suggest next experiment
 5. Update model with results
+6. Repeat until convergence
 
 **Multi-objective tips:**
 - Use Pareto front analysis
 - Weighted sum for composite score
 - Consider trade-offs between properties
+- Hypervolume indicator tracks progress
+
+**Design of Experiments (DoE):**
+- Screening: 2-level factorial (8-16 runs)
+- Optimization: Response Surface (15-30 runs)
+- Analysis: ANOVA, contour plots
 
 Want me to elaborate on any step?"""
     
     def get_greeting(self):
-        return """👋 Hello! I'm your synthesis optimization assistant.
+        return """👋 **Hello! I'm ChemNanoBot, your synthesis optimization assistant!**
 
-I can help with:
-- **Quantum Dots** (CIS/ZnS optimization)
-- **Porphyrins** (synthesis & properties)
-- **Experimental Design** (DoE)
-- **Optimization** (Bayesian, multi-objective)
+I specialize in:
+- 🧪 **Quantum Dots** (CIS/ZnS, CdSe, Perovskite)
+- 🔬 **Porphyrins** (Synthesis, metalation, properties)
+- 📊 **Experimental Design** (DoE, factorial designs)
+- 🤖 **Optimization** (Bayesian, multi-objective)
+- 📈 **Data Analysis** (Statistics, visualization)
 
-What would you like to know?"""
+**Try asking me:**
+- "How do I optimize QD absorption for 800nm?"
+- "What's the best porphyrin synthesis method?"
+- "Explain Bayesian optimization"
+- "How to improve singlet oxygen generation?"
+
+What would you like to explore today?"""
+    
+    def get_thanks_response(self):
+        return """🎉 **You're welcome!**
+
+I'm glad I could help! Feel free to ask if you have more questions about:
+- Synthesis conditions
+- Experimental design
+- Data analysis
+- Troubleshooting
+
+Happy experimenting! 🧪"""
     
     def get_general_response(self):
-        return """I'm here to help with synthesis optimization!
+        return """💡 **I'm here to help with synthesis optimization!**
 
 You can ask me about:
-- Quantum dot synthesis conditions
-- Porphyrin synthesis methods
-- Design of experiments
-- Bayesian optimization
-- Data analysis
+- **Quantum Dots**: Synthesis conditions, size control, shell growth
+- **Porphyrins**: Methods, metalation, substituent effects
+- **DoE**: Factorial designs, response surface, analysis
+- **Optimization**: Bayesian, multi-objective, Pareto fronts
+- **Data Analysis**: Statistics, visualization, interpretation
+
+**Example questions:**
+- "What temperature for CIS/ZnS core?"
+- "How to purify porphyrins?"
+- "What's the difference between Type I and Type II PDT?"
 
 What specific topic interests you?"""
 
-def display_deepseek_chatbox():
-    """AI Assistant tab"""
-    st.markdown("<h2 class='sub-header'>🤖 AI Assistant</h2>", unsafe_allow_html=True)
+
+def display_ai_assistant():
+    """AI Assistant tab with enhanced UI"""
+    
+    st.markdown("<h2 class='sub-header'>🤖 ChemNanoBot AI Assistant</h2>", unsafe_allow_html=True)
+    
+    # Custom styling for the chat interface
+    st.markdown("""
+    <style>
+    .chat-message {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .user-message {
+        background-color: #e3f2fd;
+    }
+    .assistant-message {
+        background-color: #f5f5f5;
+    }
+    .quick-question-btn {
+        margin: 0.2rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
     <div class='info-box'>
-    Chat with CHEMNANOBOT, your AI expert in quantum dot and porphyrin synthesis optimization.
+    Chat with <strong>ChemNanoBot</strong>, your AI expert in quantum dot and porphyrin synthesis optimization.
     Ask about synthesis conditions, experimental design, or data analysis!
     </div>
     """, unsafe_allow_html=True)
     
-    # Initialize chatbot
-    if 'chatbot' not in st.session_state:
-        st.session_state.chatbot = DeepseekChatbot()
+    # Initialize chatbot in session state if not exists
+    if 'ai_chatbot' not in st.session_state:
+        st.session_state.ai_chatbot = ChemNanoBot()
     
-    if 'messages' not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "👋 Hello! I'm your synthesis optimization assistant. How can I help you today?"}
+    if 'ai_messages' not in st.session_state:
+        st.session_state.ai_messages = [
+            {"role": "assistant", "content": "👋 Hello! I'm ChemNanoBot, your synthesis optimization assistant. How can I help you today?"}
         ]
     
-    # Quick questions
-    st.markdown("### Quick Questions")
-    col1, col2, col3, col4 = st.columns(4)
+    # Category-based quick questions
+    st.markdown("### 📋 Quick Question Categories")
     
-    quick_qs = [
-        "How to optimize QD absorption?",
-        "Best porphyrin synthesis?",
-        "What is Bayesian optimization?",
-        "How to improve singlet oxygen?"
-    ]
+    tab1, tab2, tab3, tab4 = st.tabs(["Quantum Dots", "Porphyrins", "Optimization", "General"])
     
-    for i, (col, q) in enumerate(zip([col1, col2, col3, col4], quick_qs)):
-        with col:
-            if st.button(q, use_container_width=True):
-                st.session_state.messages.append({"role": "user", "content": q})
-                response = st.session_state.chatbot.get_response(q)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+    with tab1:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("QD absorption >800nm", use_container_width=True):
+                prompt = "How to achieve QD absorption above 800nm?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
                 st.rerun()
+            if st.button("High PLQY QDs", use_container_width=True):
+                prompt = "How to get >60% PLQY in quantum dots?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+        with col2:
+            if st.button("Shell growth", use_container_width=True):
+                prompt = "Best method for ZnS shell growth?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+            if st.button("Size control", use_container_width=True):
+                prompt = "How to control quantum dot size?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    with tab2:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Lindsey method", use_container_width=True):
+                prompt = "Explain Lindsey method for porphyrin synthesis"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+            if st.button("High singlet oxygen", use_container_width=True):
+                prompt = "How to improve singlet oxygen generation in porphyrins?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+        with col2:
+            if st.button("Metalation", use_container_width=True):
+                prompt = "How to metalate porphyrins?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+            if st.button("Purification", use_container_width=True):
+                prompt = "Best porphyrin purification methods?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    with tab3:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Bayesian optimization", use_container_width=True):
+                prompt = "Explain Bayesian optimization for synthesis"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+            if st.button("DoE basics", use_container_width=True):
+                prompt = "What is Design of Experiments?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+        with col2:
+            if st.button("Pareto front", use_container_width=True):
+                prompt = "What is Pareto front optimization?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+            if st.button("Response surface", use_container_width=True):
+                prompt = "Explain response surface methodology"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    with tab4:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("About ChemNanoBot", use_container_width=True):
+                prompt = "Tell me about yourself"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+        with col2:
+            if st.button("Help", use_container_width=True):
+                prompt = "What can you help me with?"
+                st.session_state.ai_messages.append({"role": "user", "content": prompt})
+                response = st.session_state.ai_chatbot.get_response(prompt)
+                st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    st.markdown("---")
     
     # Display chat history
     chat_container = st.container()
     
     with chat_container:
-        for message in st.session_state.messages:
+        for message in st.session_state.ai_messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
     
     # Chat input
     if prompt := st.chat_input("Ask about synthesis optimization..."):
         # Add user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.ai_messages.append({"role": "user", "content": prompt})
         
-        # Get response
+        # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
         
+        # Get and display assistant response
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = st.session_state.chatbot.get_response(prompt)
+            with st.spinner("🔬 Analyzing your question..."):
+                response = st.session_state.ai_chatbot.get_response(prompt)
                 st.markdown(response)
         
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        # Add to history
+        st.session_state.ai_messages.append({"role": "assistant", "content": response})
     
-    # Clear chat button
-    if st.button("🗑️ Clear Chat"):
-        st.session_state.messages = [
-            {"role": "assistant", "content": "👋 Hello! I'm your synthesis optimization assistant. How can I help you today?"}
-        ]
-        st.rerun()
+    # Control buttons
+    col1, col2, col3 = st.columns([1, 1, 2])
+    
+    with col1:
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.ai_messages = [
+                {"role": "assistant", "content": "👋 Hello! I'm ChemNanoBot, your synthesis optimization assistant. How can I help you today?"}
+            ]
+            st.rerun()
+    
+    with col2:
+        if st.button("📋 Copy Last Response", use_container_width=True):
+            if len(st.session_state.ai_messages) > 1:
+                last_response = st.session_state.ai_messages[-1]["content"]
+                st.code(last_response, language="text")
+                st.info("✅ Response copied to clipboard (select and copy manually)")
+    
+    # Chat statistics
+    with st.expander("📊 Chat Statistics"):
+        user_msgs = sum(1 for m in st.session_state.ai_messages if m["role"] == "user")
+        assistant_msgs = sum(1 for m in st.session_state.ai_messages if m["role"] == "assistant")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Messages", len(st.session_state.ai_messages))
+        with col2:
+            st.metric("Your Questions", user_msgs)
+        with col3:
+            st.metric("Responses", assistant_msgs)
 
 # ============================================================================
 # Main
