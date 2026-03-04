@@ -278,7 +278,15 @@ class MolecularUtils:
 # ============================================================================
 def display_quantum_dots_tab(uploaded_file):
     st.markdown("<h2 class='sub-header'>CIS/ZnS Quantum Dot Synthesis Optimization</h2>", unsafe_allow_html=True)
-    data = uploaded_file and DataManager.load_data(uploaded_file) or DataManager.create_sample_qd_data(50)
+    # Safely load data
+if uploaded_file is not None:
+    data = DataManager.load_data(uploaded_file)
+    if data is None:
+        st.warning("Could not load uploaded file. Using sample data instead.")
+        data = DataManager.create_sample_qd_data(50)
+else:
+    data = DataManager.create_sample_qd_data(50)
+    st.info("📊 Using sample data. Upload your own CSV for real optimization.")
     if data is None:
         st.error("No data available")
         return
