@@ -15,5 +15,7 @@ torch
 torch-geometric
 requests
 scikit-optimize
+kaleido==0.2.1
+
 
 
