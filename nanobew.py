@@ -2247,7 +2247,7 @@ class DeepseekChatbot:
             return self.get_general_response()
     
     def get_qd_response(self, query):
-        return """🎯**Quantum Dot Synthesis Advice**
+        return """**Quantum Dot Synthesis Advice**
 
 For optimal CIS/ZnS quantum dots:
 
