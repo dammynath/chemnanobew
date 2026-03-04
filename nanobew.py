@@ -2232,12 +2232,12 @@ key="search_mode"
 
 #Display chat history
 for message in st.session_state.assistant_messages:
-with st.chat_message(message["role"]):
-st.markdown(message["content"])
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 if "sources" in message and message["sources"]:
-with st.expander(f"📚 Sources ({len(message['sources'])})"):
-for src in message["sources"]:
-title = src.get('title', src.get('url', 'Source'))
+    with st.expander(f"📚 Sources ({len(message['sources'])})"):
+        for src in message["sources"]:
+            title = src.get('title', src.get('url', 'Source'))
 url = src.get('url', '#')
 provider = src.get('provider', 'web')
 st.markdown(f"- {title} ({provider})")
@@ -2246,17 +2246,17 @@ st.markdown(f"- {title} ({provider})")
 if prompt := st.chat_input("Ask about synthesis, research, or any topic..."):
 
 #Add user message
-st.session_state.assistant_messages.append({"role": "user", "content": prompt})
+    st.session_state.assistant_messages.append({"role": "user", "content": prompt})
 with st.chat_message("user"):
-st.markdown(prompt)
+    st.markdown(prompt)
 
 #Generate response
 with st.chat_message("assistant"):
-with st.spinner("🔍 Searching Brave & Tavily..."):
+    with st.spinner("🔍 Searching Brave & Tavily..."):
 
 #Select search mode
-if search_mode == "Quantum Dots":
-search_results = self.search_qd_synthesis(prompt)
+        if search_mode == "Quantum Dots":
+            search_results = self.search_qd_synthesis(prompt)
 elif search_mode == "Porphyrins":
 search_results = self.search_porphyrin_synthesis(prompt)
 elif search_mode == "Chemistry Literature":
