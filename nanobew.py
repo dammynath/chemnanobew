@@ -2485,13 +2485,10 @@ def display_ai_assistant():
         with col3:
             st.metric("Responses", assistant_msgs)
 
+
 # ============================================================================
-# Main
+# Main function - COMPLETE FIXED VERSION
 # ============================================================================
-def test_assistant():
-    st.write("Testing AI Research Assistant...")
-    assistant = AIResearchAssistant()
-    assistant.render_ui()
 def main():
     with st.sidebar:
         if os.path.exists("images") and os.listdir("images"):
@@ -2499,7 +2496,18 @@ def main():
         else:
             st.markdown("<div class='sidebar-logo'><div style='font-size:3rem;'>🧪</div><div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div></div>", unsafe_allow_html=True)
         st.markdown("---")
-        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator","📊 Advanced Visualization","🤖 AI Research Assistant","AI Assistant"])
+        
+        # Two separate AI assistant options - clearly differentiated
+        mode = st.radio("Mode", [
+            "Quantum Dots",
+            "Porphyrins", 
+            "Multi‑Objective",
+            "Molecular Generator",
+            "📊 Advanced Visualization",
+            "🤖 AI Research Assistant (Web Search)",  # Brave/Tavily assistant with web search
+            "💬 ChemNanoBot (Synthesis Expert)"      # Simple rule-based chatbot
+        ])
+        
         with st.expander("Upload Logo"):
             logo = st.file_uploader("Image", type=['png','jpg','jpeg','gif'])
             if logo:
@@ -2512,6 +2520,7 @@ def main():
     st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
     st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
 
+    # Route to appropriate tab
     if mode == "Quantum Dots":
         display_quantum_dots_tab(uploaded_file)
     elif mode == "Porphyrins":
@@ -2522,13 +2531,10 @@ def main():
         display_molecular_generator_tab()
     elif mode == "📊 Advanced Visualization":
         display_advanced_visualization(uploaded_file)
-    elif mode == "🤖 AI Research Assistant":
+    elif mode == "🤖 AI Research Assistant (Web Search)":
         assistant = AIResearchAssistant()
         assistant.render_ui()
-    else:
-        display_deepseek_chatbox()
+    elif mode == "💬 ChemNanoBot (Synthesis Expert)":
+        display_ai_assistant()
 
     st.markdown("<div class='footer'>Powered by CHEMNANOBEW GROUP • RDKit‑Mode version</div>", unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main()
