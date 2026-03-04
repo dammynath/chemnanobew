@@ -2167,136 +2167,136 @@ class AIResearchAssistant:
         enhanced_query = f"{query} porphyrin synthesis photodynamic therapy"
         return self.search_all(enhanced_query)
     
-   # ========================================================================
-    # UI Rendering
-    # ========================================================================
-    def render_ui(self):
-        """Render the AI Assistant UI in Streamlit"""
+  # ========================================================================
+# UI Rendering
+# ========================================================================
+def render_ui(self):
+    """Render the AI Assistant UI in Streamlit"""
+    
+    st.markdown("<h2 class='sub-header'>🤖 AI Research Assistant</h2>", unsafe_allow_html=True)
+    
+    # API Status Display
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.session_state.api_status['brave']:
+            st.success("✅ Brave Search")
+        else:
+            st.warning("⚠️ Brave Search")
+    with col2:
+        if st.session_state.api_status['tavily']:
+            st.success("✅ Tavily Search")
+        else:
+            st.warning("⚠️ Tavily Search")
+    with col3:
+        if st.session_state.api_status['openai']:
+            st.success("✅ OpenAI")
+        else:
+            st.error("❌ OpenAI")
+    
+    # Configuration instructions if APIs missing
+    if not all(st.session_state.api_status.values()):
+        with st.expander("🔧 Configure APIs", expanded=True):
+            st.markdown("""
+            ### Get Your Free API Keys:
+            
+            **1. OpenAI** (Required)
+            - Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+            - Create new key → Copy it
+            
+            **2. Brave Search** (Free - Recommended)
+            - Go to [brave.com/search/api](https://brave.com/search/api)
+            - Sign up for free tier (2000 queries/month)
+            - Copy your API key
+            
+            **3. Tavily** (Free - Recommended)
+            - Go to [tavily.com](https://tavily.com)
+            - Sign up for free tier (1000 searches/month)
+            - Copy your API key
+            
+            **Add to `.streamlit/secrets.toml`:**
+            ```toml
+            OPENAI_API_KEY = "sk-..."
+            BRAVE_API_KEY = "BSA..."
+            TAVILY_API_KEY = "tvly-..."
+            """)
+            
+            st.markdown("---")
+    
+    # Search mode selector
+    search_mode = st.radio(
+        "Search Mode",
+        ["General Research", "Quantum Dots", "Porphyrins", "Chemistry Literature"],
+        horizontal=True,
+        key="search_mode"
+    )
+    
+    # Display chat history
+    for message in st.session_state.assistant_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if "sources" in message and message["sources"]:
+                with st.expander(f"📚 Sources ({len(message['sources'])})"):
+                    for src in message["sources"]:
+                        title = src.get('title', src.get('url', 'Source'))
+                        url = src.get('url', '#')
+                        provider = src.get('provider', 'web')
+                        st.markdown(f"- [{title}]({url}) ({provider})")
+    
+    # Chat input
+    if prompt := st.chat_input("Ask about synthesis, research, or any topic..."):
         
-        st.markdown("<h2 class='sub-header'>🤖 AI Research Assistant</h2>", unsafe_allow_html=True)
+        # Add user message
+        st.session_state.assistant_messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
         
-        # API Status Display
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.session_state.api_status['brave']:
-                st.success("✅ Brave Search")
-            else:
-                st.warning("⚠️ Brave Search")
-        with col2:
-            if st.session_state.api_status['tavily']:
-                st.success("✅ Tavily Search")
-            else:
-                st.warning("⚠️ Tavily Search")
-        with col3:
-            if st.session_state.api_status['openai']:
-                st.success("✅ OpenAI")
-            else:
-                st.error("❌ OpenAI")
+        # Generate response
+        with st.chat_message("assistant"):
+            with st.spinner("🔍 Searching Brave & Tavily..."):
+                
+                # Select search mode
+                if search_mode == "Quantum Dots":
+                    search_results = self.search_qd_synthesis(prompt)
+                elif search_mode == "Porphyrins":
+                    search_results = self.search_porphyrin_synthesis(prompt)
+                elif search_mode == "Chemistry Literature":
+                    search_results = self.search_chemistry_literature(prompt)
+                else:
+                    search_results = self.search_all(prompt)
+            
+            # Generate AI response
+            with st.spinner("🧠 Thinking..."):
+                response = self.generate_response(prompt, search_results)
+                st.markdown(response)
+            
+            # Show sources
+            if search_results['sources']:
+                with st.expander(f"📚 Sources ({len(search_results['sources'])})"):
+                    for src in search_results['sources'][:5]:  # Show top 5
+                        title = src.get('title', src.get('url', 'Source'))
+                        url = src.get('url', '#')
+                        provider = src.get('provider', 'web')
+                        st.markdown(f"- [{title}]({url}) ({provider})")
+                    
+                    if len(search_results['sources']) > 5:
+                        st.caption(f"... and {len(search_results['sources']) - 5} more sources")
+            
+            # Save to session
+            st.session_state.assistant_messages.append({
+                "role": "assistant",
+                "content": response,
+                "sources": search_results['sources'][:10]
+            })
+    
+    # Sidebar with search history
+    with st.sidebar.expander("📜 Search History", expanded=False):
+        for i, msg in enumerate(st.session_state.assistant_messages[-10:]):
+            if msg["role"] == "user":
+                st.markdown(f"Q{i}: {msg['content'][:50]}...")
         
-        # Configuration instructions if APIs missing
-        if not all(st.session_state.api_status.values()):
-            with st.expander("🔧 Configure APIs", expanded=True):
-                st.markdown("""
-                ### Get Your Free API Keys:
-                
-                **1. OpenAI** (Required)
-                - Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-                - Create new key → Copy it
-                
-                **2. Brave Search** (Free - Recommended)
-                - Go to [brave.com/search/api](https://brave.com/search/api)
-                - Sign up for free tier (2000 queries/month)
-                - Copy your API key
-                
-                **3. Tavily** (Free - Recommended)
-                - Go to [tavily.com](https://tavily.com)
-                - Sign up for free tier (1000 searches/month)
-                - Copy your API key
-                
-                **Add to `.streamlit/secrets.toml`:**
-                ```toml
-                OPENAI_API_KEY = "sk-..."
-                BRAVE_API_KEY = "BSA..."
-                TAVILY_API_KEY = "tvly-..."
-                """)
-
-                st.markdown("---")
-
-#Search mode selector
-search_mode = st.radio(
-"Search Mode",
-["General Research", "Quantum Dots", "Porphyrins", "Chemistry Literature"],
-horizontal=True,
-key="search_mode"
-)
-
-#Display chat history
-for message in st.session_state.assistant_messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-if "sources" in message and message["sources"]:
-    with st.expander(f"📚 Sources ({len(message['sources'])})"):
-        for src in message["sources"]:
-            title = src.get('title', src.get('url', 'Source'))
-url = src.get('url', '#')
-provider = src.get('provider', 'web')
-st.markdown(f"- {title} ({provider})")
-
-#Chat input
-if prompt := st.chat_input("Ask about synthesis, research, or any topic..."):
-
-#Add user message
-    st.session_state.assistant_messages.append({"role": "user", "content": prompt})
-with st.chat_message("user"):
-    st.markdown(prompt)
-
-#Generate response
-with st.chat_message("assistant"):
-    with st.spinner("🔍 Searching Brave & Tavily..."):
-
-#Select search mode
-        if search_mode == "Quantum Dots":
-            search_results = self.search_qd_synthesis(prompt)
-elif search_mode == "Porphyrins":
-search_results = self.search_porphyrin_synthesis(prompt)
-elif search_mode == "Chemistry Literature":
-search_results = self.search_chemistry_literature(prompt)
-else:
-search_results = self.search_all(prompt)
-
-#Generate AI response
-with st.spinner("🧠 Thinking..."):
-response = self.generate_response(prompt, search_results)
-st.markdown(response)
-
-#Show sources
-if search_results['sources']:
-with st.expander(f"📚 Sources ({len(search_results['sources'])})"):
-for src in search_results['sources'][:5]: # Show top 5
-title = src.get('title', src.get('url', 'Source'))
-url = src.get('url', '#')
-provider = src.get('provider', 'web')
-st.markdown(f"- {title} ({provider})")
-
-if len(search_results['sources']) > 5:
-st.caption(f"... and {len(search_results['sources']) - 5} more sources")
-
-#Save to session
-st.session_state.assistant_messages.append({
-"role": "assistant",
-"content": response,
-"sources": search_results['sources'][:10]
-})
-
-#Sidebar with search history
-with st.sidebar.expander("📜 Search History", expanded=False):
-for i, msg in enumerate(st.session_state.assistant_messages[-10:]):
-if msg["role"] == "user":
-st.markdown(f"Q{i}: {msg['content'][:50]}...")
-
-if st.button("Clear Chat"):
-st.session_state.assistant_messages = []
-st.rerun()
+        if st.button("Clear Chat"):
+            st.session_state.assistant_messages = []
+            st.rerun()
 
 # ============================================================================
 # Tab: AI Assistant (unchanged)
