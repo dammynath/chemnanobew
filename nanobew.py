@@ -1306,6 +1306,514 @@ def display_molecular_generator_tab():
         st.warning("Not enough numeric factors for DoE.")
 
 # ============================================================================
+# Advanced Visualization & Analytics Tab
+# ============================================================================
+def display_advanced_visualization(uploaded_file):
+    """Generate multiple plots based on user-selected parameters"""
+    
+    st.markdown("<h2 class='sub-header'>📊 Advanced Visualization & Analytics</h2>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class='info-box'>
+    Generate multiple plots and visualizations based on your experimental data. 
+    Select parameters below to create customized graphs for analysis.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Dataset selection
+    dataset_type = st.radio(
+        "Select Dataset",
+        ["Quantum Dots", "Porphyrins"],
+        horizontal=True,
+        key="viz_dataset"
+    )
+    
+    # Load appropriate data
+    if dataset_type == "Quantum Dots":
+        if uploaded_file is not None:
+            data = DataManager.load_data(uploaded_file)
+            if data is None:
+                st.warning("Could not load uploaded file. Using sample data.")
+                data = DataManager.create_sample_qd_data(100)
+        else:
+            data = DataManager.create_sample_qd_data(100)
+            st.info("📊 Using sample quantum dots data. Upload your own CSV for real analysis.")
+        
+        # Define parameter categories for QDs
+        param_categories = {
+            "Precursor Parameters": ['precursor_ratio', 'zn_precursor'],
+            "Reaction Parameters": ['temperature', 'reaction_time', 'ph'],
+            "Optical Properties": ['absorption_nm', 'plqy_percent', 'pce_percent', 'soq_au'],
+            "Categorical": ['surfactant', 'solvent']
+        }
+        
+    else:  # Porphyrins
+        if uploaded_file is not None:
+            data = DataManager.load_data(uploaded_file)
+            if data is None:
+                st.warning("Could not load uploaded file. Using sample data.")
+                data = DataManager.create_sample_porphyrin_data(100)
+        else:
+            data = DataManager.create_sample_porphyrin_data(100)
+            st.info("📊 Using sample porphyrin data. Upload your own CSV for real analysis.")
+        
+        # Define parameter categories for Porphyrins
+        param_categories = {
+            "Concentration Parameters": ['aldehyde_conc', 'pyrrole_conc', 'catalyst_conc'],
+            "Reaction Parameters": ['temperature', 'reaction_time'],
+            "Product Properties": ['yield_percent', 'purity_percent', 'singlet_oxygen_au', 'fluorescence_qy'],
+            "Categorical": ['catalyst_type', 'solvent']
+        }
+    
+    if data is None or len(data) == 0:
+        st.error("No data available for visualization")
+        return
+    
+    # Get numeric and categorical columns
+    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = data.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    # Main visualization controls
+    st.markdown("### 🎛️ Visualization Controls")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        plot_type = st.selectbox(
+            "Plot Type",
+            ["Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot", 
+             "Violin Plot", "Heatmap", "3D Scatter", "Pair Plot", "Contour Plot",
+             "Radar Chart", "Bubble Chart", "Area Chart", "Error Bar Plot"],
+            key="plot_type"
+        )
+    
+    with col2:
+        chart_theme = st.selectbox(
+            "Color Theme",
+            ["Plotly", "ggplot2", "seaborn", "simple_white", "presentation", "xgridoff"],
+            key="chart_theme"
+        )
+    
+    with col3:
+        chart_height = st.slider("Chart Height", 400, 800, 500, step=50, key="chart_height")
+    
+    # Dynamic plot configuration based on plot type
+    st.markdown("### ⚙️ Plot Configuration")
+    
+    if plot_type in ["Scatter Plot", "Line Plot", "Bubble Chart", "Error Bar Plot"]:
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            x_axis = st.selectbox("X-axis", numeric_cols, index=0 if numeric_cols else None, key="viz_x")
+        with col2:
+            y_axis = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1) if len(numeric_cols) > 1 else 0, key="viz_y")
+        with col3:
+            color_by = st.selectbox("Color by", ['None'] + numeric_cols + categorical_cols, key="viz_color")
+        
+        if plot_type == "Bubble Chart":
+            size_by = st.selectbox("Bubble Size", numeric_cols, index=min(2, len(numeric_cols)-1) if len(numeric_cols) > 2 else 0, key="viz_size")
+        
+        if plot_type == "Error Bar Plot":
+            error_y = st.selectbox("Error Bars", numeric_cols, index=min(1, len(numeric_cols)-1), key="viz_error")
+    
+    elif plot_type in ["Bar Chart", "Box Plot", "Violin Plot"]:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            x_axis = st.selectbox("X-axis (categories)", categorical_cols if categorical_cols else ['None'], 
+                                 index=0 if categorical_cols else 0, key="viz_cat_x")
+        with col2:
+            y_axis = st.selectbox("Y-axis (values)", numeric_cols, index=0 if numeric_cols else None, key="viz_cat_y")
+        
+        if categorical_cols:
+            split_by = st.selectbox("Split by", ['None'] + categorical_cols, key="viz_split")
+    
+    elif plot_type in ["Histogram"]:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            hist_var = st.selectbox("Variable", numeric_cols, index=0, key="viz_hist")
+        with col2:
+            n_bins = st.slider("Number of Bins", 5, 100, 30, key="viz_bins")
+        
+        hist_norm = st.selectbox("Normalization", ['probability density', 'probability', 'percent', 'density'], key="viz_hist_norm")
+    
+    elif plot_type in ["Heatmap"]:
+        st.info("Heatmap shows correlation between numeric variables")
+        if st.checkbox("Show all correlations", value=True, key="viz_heat_all"):
+            corr_vars = numeric_cols
+        else:
+            corr_vars = st.multiselect("Select variables for correlation", numeric_cols, default=numeric_cols[:4], key="viz_heat_vars")
+    
+    elif plot_type in ["3D Scatter"]:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            x_axis = st.selectbox("X-axis", numeric_cols, index=0, key="viz_3d_x")
+        with col2:
+            y_axis = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1), key="viz_3d_y")
+        with col3:
+            z_axis = st.selectbox("Z-axis", numeric_cols, index=min(2, len(numeric_cols)-1), key="viz_3d_z")
+        with col4:
+            color_3d = st.selectbox("Color", ['None'] + numeric_cols + categorical_cols, key="viz_3d_color")
+    
+    elif plot_type in ["Contour Plot"]:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            x_axis = st.selectbox("X-axis", numeric_cols, index=0, key="viz_cont_x")
+        with col2:
+            y_axis = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1), key="viz_cont_y")
+        
+        z_axis = st.selectbox("Z-axis (values)", numeric_cols, index=min(2, len(numeric_cols)-1), key="viz_cont_z")
+    
+    elif plot_type in ["Radar Chart"]:
+        radar_vars = st.multiselect("Select variables for radar chart", numeric_cols, default=numeric_cols[:4], key="viz_radar")
+        if categorical_cols:
+            radar_group = st.selectbox("Group by", ['None'] + categorical_cols, key="viz_radar_group")
+    
+    elif plot_type in ["Pair Plot"]:
+        pair_vars = st.multiselect("Select variables for pair plot", numeric_cols, default=numeric_cols[:4], key="viz_pair")
+        if categorical_cols:
+            pair_color = st.selectbox("Color by", ['None'] + categorical_cols, key="viz_pair_color")
+    
+    elif plot_type in ["Area Chart"]:
+        area_vars = st.multiselect("Select variables for area chart", numeric_cols, default=numeric_cols[:3], key="viz_area")
+        area_x = st.selectbox("X-axis (usually index/order)", numeric_cols, index=0, key="viz_area_x")
+    
+    # Generate button
+    if st.button("🎨 Generate Plot", use_container_width=True, type="primary"):
+        with st.spinner("Generating visualization..."):
+            time.sleep(0.5)  # Small delay for effect
+            
+            fig = None
+            
+            try:
+                # Generate plot based on type
+                if plot_type == "Scatter Plot":
+                    if color_by == 'None':
+                        fig = px.scatter(data, x=x_axis, y=y_axis, 
+                                       title=f"{y_axis} vs {x_axis}",
+                                       template=chart_theme,
+                                       height=chart_height)
+                    else:
+                        fig = px.scatter(data, x=x_axis, y=y_axis, color=color_by,
+                                       title=f"{y_axis} vs {x_axis} (colored by {color_by})",
+                                       template=chart_theme,
+                                       height=chart_height)
+                
+                elif plot_type == "Line Plot":
+                    if color_by == 'None':
+                        fig = px.line(data, x=x_axis, y=y_axis,
+                                     title=f"{y_axis} vs {x_axis}",
+                                     template=chart_theme,
+                                     height=chart_height)
+                    else:
+                        fig = px.line(data, x=x_axis, y=y_axis, color=color_by,
+                                     title=f"{y_axis} vs {x_axis} (colored by {color_by})",
+                                     template=chart_theme,
+                                     height=chart_height)
+                
+                elif plot_type == "Bubble Chart":
+                    fig = px.scatter(data, x=x_axis, y=y_axis, size=size_by,
+                                   color=color_by if color_by != 'None' else None,
+                                   title=f"Bubble Chart: {y_axis} vs {x_axis}",
+                                   template=chart_theme,
+                                   height=chart_height)
+                
+                elif plot_type == "Error Bar Plot":
+                    # Calculate mean and std for error bars
+                    if color_by != 'None' and color_by in categorical_cols:
+                        grouped = data.groupby(color_by)[[x_axis, y_axis]].agg(['mean', 'std']).reset_index()
+                        grouped.columns = [color_by, f'{x_axis}_mean', f'{x_axis}_std', f'{y_axis}_mean', f'{y_axis}_std']
+                        
+                        fig = go.Figure()
+                        for cat in grouped[color_by].unique():
+                            cat_data = grouped[grouped[color_by] == cat]
+                            fig.add_trace(go.Scatter(
+                                x=cat_data[f'{x_axis}_mean'],
+                                y=cat_data[f'{y_axis}_mean'],
+                                name=str(cat),
+                                mode='markers+lines',
+                                error_y=dict(
+                                    type='data',
+                                    array=cat_data[f'{y_axis}_std'],
+                                    visible=True
+                                )
+                            ))
+                    else:
+                        # Simple error bars using std dev
+                        x_mean = data[x_axis].mean()
+                        x_std = data[x_axis].std()
+                        y_mean = data[y_axis].mean()
+                        y_std = data[y_axis].std()
+                        
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            x=[x_mean],
+                            y=[y_mean],
+                            mode='markers',
+                            marker=dict(size=10),
+                            error_x=dict(type='data', array=[x_std], visible=True),
+                            error_y=dict(type='data', array=[y_std], visible=True)
+                        ))
+                    
+                    fig.update_layout(title="Error Bar Plot", template=chart_theme, height=chart_height)
+                
+                elif plot_type == "Bar Chart":
+                    if x_axis != 'None' and x_axis in data.columns:
+                        if split_by != 'None' and split_by in data.columns:
+                            # Grouped bar chart
+                            pivot = data.pivot_table(index=x_axis, columns=split_by, values=y_axis, aggfunc='mean')
+                            fig = px.bar(pivot, barmode='group', 
+                                       title=f"Bar Chart: {y_axis} by {x_axis} and {split_by}",
+                                       template=chart_theme,
+                                       height=chart_height)
+                        else:
+                            # Simple bar chart
+                            fig = px.bar(data, x=x_axis, y=y_axis,
+                                       title=f"Bar Chart: {y_axis} by {x_axis}",
+                                       template=chart_theme,
+                                       height=chart_height)
+                    else:
+                        # Count plot
+                        fig = px.bar(data[x_axis].value_counts().reset_index(),
+                                   x='index', y=x_axis,
+                                   title=f"Count of {x_axis}",
+                                   template=chart_theme,
+                                   height=chart_height)
+                
+                elif plot_type == "Box Plot":
+                    if x_axis != 'None' and x_axis in data.columns:
+                        fig = px.box(data, x=x_axis, y=y_axis,
+                                   title=f"Box Plot: {y_axis} by {x_axis}",
+                                   template=chart_theme,
+                                   height=chart_height)
+                    else:
+                        fig = px.box(data, y=y_axis,
+                                   title=f"Box Plot: {y_axis}",
+                                   template=chart_theme,
+                                   height=chart_height)
+                
+                elif plot_type == "Violin Plot":
+                    if x_axis != 'None' and x_axis in data.columns:
+                        fig = px.violin(data, x=x_axis, y=y_axis,
+                                      box=True, points="all",
+                                      title=f"Violin Plot: {y_axis} by {x_axis}",
+                                      template=chart_theme,
+                                      height=chart_height)
+                    else:
+                        fig = px.violin(data, y=y_axis,
+                                      box=True, points="all",
+                                      title=f"Violin Plot: {y_axis}",
+                                      template=chart_theme,
+                                      height=chart_height)
+                
+                elif plot_type == "Histogram":
+                    fig = px.histogram(data, x=hist_var, nbins=n_bins,
+                                     histnorm=hist_norm,
+                                     title=f"Histogram of {hist_var}",
+                                     template=chart_theme,
+                                     height=chart_height)
+                
+                elif plot_type == "Heatmap":
+                    if len(corr_vars) > 1:
+                        corr_matrix = data[corr_vars].corr()
+                        fig = px.imshow(corr_matrix,
+                                      text_auto=True,
+                                      aspect="auto",
+                                      color_continuous_scale='RdBu_r',
+                                      title="Correlation Heatmap",
+                                      template=chart_theme,
+                                      height=chart_height)
+                    else:
+                        st.warning("Please select at least 2 variables for correlation")
+                
+                elif plot_type == "3D Scatter":
+                    if color_3d == 'None':
+                        fig = px.scatter_3d(data, x=x_axis, y=y_axis, z=z_axis,
+                                          title=f"3D Scatter: {x_axis}, {y_axis}, {z_axis}",
+                                          template=chart_theme,
+                                          height=chart_height)
+                    else:
+                        fig = px.scatter_3d(data, x=x_axis, y=y_axis, z=z_axis,
+                                          color=color_3d,
+                                          title=f"3D Scatter colored by {color_3d}",
+                                          template=chart_theme,
+                                          height=chart_height)
+                
+                elif plot_type == "Contour Plot":
+                    # Create a 2D histogram / contour
+                    fig = px.density_contour(data, x=x_axis, y=y_axis, z=z_axis,
+                                            title=f"Contour Plot: {z_axis} over {x_axis}-{y_axis}",
+                                            template=chart_theme,
+                                            height=chart_height)
+                
+                elif plot_type == "Radar Chart":
+                    if radar_vars:
+                        if radar_group != 'None' and radar_group in data.columns:
+                            # Grouped radar chart
+                            radar_data = data.groupby(radar_group)[radar_vars].mean().reset_index()
+                            fig = px.line_polar(radar_data, r=radar_vars[0], theta=radar_vars,
+                                              line_close=True,
+                                              title=f"Radar Chart grouped by {radar_group}",
+                                              template=chart_theme,
+                                              height=chart_height)
+                        else:
+                            # Single radar chart (mean values)
+                            radar_vals = data[radar_vars].mean().reset_index()
+                            radar_vals.columns = ['parameter', 'value']
+                            fig = px.line_polar(radar_vals, r='value', theta='parameter',
+                                              line_close=True,
+                                              title="Radar Chart (Mean Values)",
+                                              template=chart_theme,
+                                              height=chart_height)
+                    else:
+                        st.warning("Please select variables for radar chart")
+                
+                elif plot_type == "Pair Plot":
+                    if pair_vars:
+                        if pair_color != 'None' and pair_color in data.columns:
+                            fig = px.scatter_matrix(data, dimensions=pair_vars,
+                                                  color=pair_color,
+                                                  title=f"Pair Plot colored by {pair_color}",
+                                                  template=chart_theme,
+                                                  height=chart_height)
+                        else:
+                            fig = px.scatter_matrix(data, dimensions=pair_vars,
+                                                  title="Pair Plot",
+                                                  template=chart_theme,
+                                                  height=chart_height)
+                    else:
+                        st.warning("Please select variables for pair plot")
+                
+                elif plot_type == "Area Chart":
+                    if area_vars:
+                        # Sort by x-axis for proper area chart
+                        area_data = data.sort_values(area_x)
+                        fig = px.area(area_data, x=area_x, y=area_vars,
+                                    title="Area Chart",
+                                    template=chart_theme,
+                                    height=chart_height)
+                    else:
+                        st.warning("Please select variables for area chart")
+                
+                # Display the plot
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Add download button for the plot
+                    with st.expander("📥 Download Plot"):
+                        img_bytes = fig.to_image(format="png", width=1200, height=800)
+                        st.download_button(
+                            label="Download as PNG",
+                            data=img_bytes,
+                            file_name=f"{plot_type.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                            mime="image/png"
+                        )
+                        
+                        # HTML download
+                        html_str = fig.to_html()
+                        st.download_button(
+                            label="Download as HTML",
+                            data=html_str,
+                            file_name=f"{plot_type.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                            mime="text/html"
+                        )
+                else:
+                    st.warning("Could not generate plot with current settings")
+                    
+            except Exception as e:
+                st.error(f"Error generating plot: {str(e)}")
+                st.info("Try different parameters or check your data format")
+    
+    # Additional Analytics Section
+    st.markdown("---")
+    st.markdown("### 📈 Statistical Summary")
+    
+    if st.checkbox("Show Detailed Statistics", key="show_stats"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Descriptive Statistics")
+            st.dataframe(data.describe(), use_container_width=True)
+        
+        with col2:
+            st.markdown("#### Missing Values")
+            missing_df = pd.DataFrame({
+                'Column': data.columns,
+                'Missing Count': data.isnull().sum().values,
+                'Missing %': (data.isnull().sum().values / len(data) * 100).round(2)
+            })
+            st.dataframe(missing_df, use_container_width=True)
+    
+    # Outlier Detection
+    with st.expander("🔍 Outlier Detection"):
+        outlier_var = st.selectbox("Select variable for outlier detection", numeric_cols, key="outlier_var")
+        
+        if outlier_var:
+            # Calculate IQR
+            Q1 = data[outlier_var].quantile(0.25)
+            Q3 = data[outlier_var].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            outliers = data[(data[outlier_var] < lower_bound) | (data[outlier_var] > upper_bound)]
+            
+            st.metric("Outliers Detected", len(outliers))
+            
+            if len(outliers) > 0:
+                st.dataframe(outliers, use_container_width=True)
+                
+                # Visualize outliers
+                fig = go.Figure()
+                fig.add_trace(go.Box(y=data[outlier_var], name='All Data', boxmean='sd'))
+                fig.add_trace(go.Scatter(x=['Outliers']*len(outliers), y=outliers[outlier_var],
+                                       mode='markers', name='Outliers',
+                                       marker=dict(color='red', size=8)))
+                fig.update_layout(title=f"Outliers in {outlier_var}", height=400)
+                st.plotly_chart(fig, use_container_width=True)
+    
+    # Trend Analysis
+    with st.expander("📉 Trend Analysis"):
+        trend_x = st.selectbox("X-axis (time/order)", numeric_cols, index=0, key="trend_x")
+        trend_y = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1), key="trend_y")
+        
+        if trend_x and trend_y:
+            # Sort by x
+            trend_data = data.sort_values(trend_x)
+            
+            # Calculate moving average
+            window = st.slider("Moving Average Window", 2, 20, 5, key="trend_window")
+            trend_data['moving_avg'] = trend_data[trend_y].rolling(window=window, center=True).mean()
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=trend_data[trend_x], y=trend_data[trend_y],
+                                    mode='markers', name='Raw Data', opacity=0.5))
+            fig.add_trace(go.Scatter(x=trend_data[trend_x], y=trend_data['moving_avg'],
+                                    mode='lines', name=f'{window}-point Moving Average',
+                                    line=dict(color='red', width=3)))
+            
+            # Add trend line
+            from sklearn.linear_model import LinearRegression
+            X = trend_data[trend_x].values.reshape(-1, 1)
+            y = trend_data[trend_y].values
+            model = LinearRegression().fit(X, y)
+            trend_data['trend'] = model.predict(X)
+            
+            fig.add_trace(go.Scatter(x=trend_data[trend_x], y=trend_data['trend'],
+                                    mode='lines', name='Linear Trend',
+                                    line=dict(color='green', width=2, dash='dash')))
+            
+            fig.update_layout(title=f"Trend Analysis: {trend_y} vs {trend_x}", height=500)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Show trend statistics
+            st.markdown(f"**Trend Equation:** y = {model.coef_[0]:.4f} * x + {model.intercept_:.4f}")
+            st.markdown(f"**R² Score:** {model.score(X, y):.4f}")
+
+# ============================================================================
 # Tab: AI Assistant (unchanged)
 # ============================================================================
 # ============================================================================
@@ -1487,7 +1995,7 @@ def main():
         else:
             st.markdown("<div class='sidebar-logo'><div style='font-size:3rem;'>🧪</div><div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div></div>", unsafe_allow_html=True)
         st.markdown("---")
-        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator","AI Assistant"])
+        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator", "📊 Advanced Visualization", "AI Assistant"])
         with st.expander("Upload Logo"):
             logo = st.file_uploader("Image", type=['png','jpg','jpeg','gif'])
             if logo:
@@ -1508,6 +2016,8 @@ def main():
         display_multi_objective_tab()
     elif mode == "Molecular Generator":
         display_molecular_generator_tab()
+    elif mode == "Advanced Visualization":
+        display_advanced_visualization(uploaded_file)
     else:
         display_deepseek_chatbox()
 
