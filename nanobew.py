@@ -2220,9 +2220,9 @@ class AIResearchAssistant:
                 TAVILY_API_KEY = "tvly-..."
                 """)
 
-st.markdown("---")
+                st.markdown("---")
 
-Search mode selector
+#Search mode selector
 search_mode = st.radio(
 "Search Mode",
 ["General Research", "Quantum Dots", "Porphyrins", "Chemistry Literature"],
@@ -2230,7 +2230,7 @@ horizontal=True,
 key="search_mode"
 )
 
-Display chat history
+#Display chat history
 for message in st.session_state.assistant_messages:
 with st.chat_message(message["role"]):
 st.markdown(message["content"])
@@ -2242,19 +2242,19 @@ url = src.get('url', '#')
 provider = src.get('provider', 'web')
 st.markdown(f"- {title} ({provider})")
 
-Chat input
+#Chat input
 if prompt := st.chat_input("Ask about synthesis, research, or any topic..."):
 
-Add user message
+#Add user message
 st.session_state.assistant_messages.append({"role": "user", "content": prompt})
 with st.chat_message("user"):
 st.markdown(prompt)
 
-Generate response
+#Generate response
 with st.chat_message("assistant"):
 with st.spinner("🔍 Searching Brave & Tavily..."):
 
-Select search mode
+#Select search mode
 if search_mode == "Quantum Dots":
 search_results = self.search_qd_synthesis(prompt)
 elif search_mode == "Porphyrins":
@@ -2264,12 +2264,12 @@ search_results = self.search_chemistry_literature(prompt)
 else:
 search_results = self.search_all(prompt)
 
-Generate AI response
+#Generate AI response
 with st.spinner("🧠 Thinking..."):
 response = self.generate_response(prompt, search_results)
 st.markdown(response)
 
-Show sources
+#Show sources
 if search_results['sources']:
 with st.expander(f"📚 Sources ({len(search_results['sources'])})"):
 for src in search_results['sources'][:5]: # Show top 5
@@ -2281,14 +2281,14 @@ st.markdown(f"- {title} ({provider})")
 if len(search_results['sources']) > 5:
 st.caption(f"... and {len(search_results['sources']) - 5} more sources")
 
-Save to session
+#Save to session
 st.session_state.assistant_messages.append({
 "role": "assistant",
 "content": response,
 "sources": search_results['sources'][:10]
 })
 
-Sidebar with search history
+#Sidebar with search history
 with st.sidebar.expander("📜 Search History", expanded=False):
 for i, msg in enumerate(st.session_state.assistant_messages[-10:]):
 if msg["role"] == "user":
