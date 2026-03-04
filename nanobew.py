@@ -2691,6 +2691,10 @@ def display_ai_assistant():
 # ============================================================================
 # Main
 # ============================================================================
+def test_assistant():
+    st.write("Testing AI Research Assistant...")
+    assistant = AIResearchAssistant()
+    assistant.render_ui()
 def main():
     with st.sidebar:
         if os.path.exists("images") and os.listdir("images"):
@@ -2723,7 +2727,7 @@ def main():
         display_advanced_visualization(uploaded_file)
     elif mode == "🤖 AI Research Assistant":
         assistant = AIResearchAssistant()
-        assistant.render_ui(self)
+        assistant.render_ui()
     else:
         display_deepseek_chatbox()
 
