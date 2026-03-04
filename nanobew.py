@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestRegressor
+import plotly.io as pio
 #from skopt import gp_minimize
 #from skopt.space import Real
 import base64
@@ -1390,7 +1391,7 @@ def display_advanced_visualization(uploaded_file):
     with col2:
         chart_theme = st.selectbox(
             "Color Theme",
-            ["Plotly", "ggplot2", "seaborn", "simple_white", "presentation", "xgridoff"],
+            ["plotly", "ggplot2", "seaborn", "simple_white", "presentation", "xgridoff"],
             key="chart_theme"
         )
     
