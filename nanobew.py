@@ -1153,7 +1153,7 @@ def display_porphyrins_tab(uploaded_file):
                 with st.expander("📋 Pareto Optimal Experiments"):
                     st.dataframe(pareto_data, use_container_width=True)
         else:
-            st.warning("No data available for multi-objective optimization.")error("❌ Invalid SMILES string")
+            st.warning("No data available for multi-objective optimization.")
 
 
 # ============================================================================
