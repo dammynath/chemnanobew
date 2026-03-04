@@ -10,7 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestRegressor
-from skopt import gp_minimize
+#from skopt import gp_minimize
 from skopt.space import Real
 import base64
 from PIL import Image
@@ -460,7 +460,8 @@ def train_random_forest(df, target_cols):
 
 def bayesian_optimize(model, ranges, target_cols):
     """Simple Bayesian optimization placeholder"""
-        
+    from skopt import gp_minimize
+    from skopt.space import Real    
     # Define search space
     dimensions = []
     param_names = []
