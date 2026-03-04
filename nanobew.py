@@ -2625,7 +2625,7 @@ def main():
     with col2:
         st.markdown("""
         <div style='text-align: center; color: #7f8c8d; padding: 1rem;'>
-            <p>Powered by CHEMNANOBEW GROUP • v2.1 (RDKit Mode)</p>
+            <p>Powered by CHEMNANOBEW GROUP • v2.1</p>
             <p style='font-size: 0.8rem;'>© 2024 CHEM-NANO-BEW Laboratory</p>
         </div>
         """, unsafe_allow_html=True)
