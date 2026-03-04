@@ -16,6 +16,12 @@ torch-geometric
 requests
 scikit-optimize
 kaleido==0.2.1
+langchain==0.3.26
+langchain-community==0.3.27
+langchain-openai==0.3.8
+tavily-python>=0.5.0
+langchain-tavily>=0.2.0
+
 
 
 
