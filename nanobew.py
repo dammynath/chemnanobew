@@ -1815,6 +1815,284 @@ def display_advanced_visualization(uploaded_file):
             st.markdown(f"**R² Score:** {model.score(X, y):.4f}")
 
 # ============================================================================
+# AI Research Assistant with Web Search
+# ============================================================================
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain.tools import Tool
+from langchain_community.tools import DuckDuckGoSearchRun, WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+from langchain_openai import ChatOpenAI
+from langchain_tavily import TavilySearch
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
+import json
+
+class AIResearchAssistant:
+    """AI Assistant with real-time web search capabilities"""
+    
+    def __init__(self):
+        self.initialize_session_state()
+    
+    def initialize_session_state(self):
+        """Initialize session state variables"""
+        if 'assistant_messages' not in st.session_state:
+            st.session_state.assistant_messages = []
+        if 'assistant_initialized' not in st.session_state:
+            st.session_state.assistant_initialized = False
+        if 'agent_executor' not in st.session_state:
+            st.session_state.agent_executor = None
+    
+    def setup_agent(self, api_key, model_choice, search_provider):
+        """Setup the LangChain agent with tools"""
+        
+        # Initialize LLM
+        if model_choice == "OpenAI GPT-4":
+            llm = ChatOpenAI(
+                model="gpt-4-turbo-preview",
+                temperature=0.7,
+                api_key=api_key
+            )
+        elif model_choice == "OpenAI GPT-3.5":
+            llm = ChatOpenAI(
+                model="gpt-3.5-turbo",
+                temperature=0.7,
+                api_key=api_key
+            )
+        else:
+            # Default to GPT-3.5
+            llm = ChatOpenAI(
+                model="gpt-3.5-turbo",
+                temperature=0.7,
+                api_key=api_key
+            )
+        
+        # Initialize tools based on selection
+        tools = []
+        
+        if "DuckDuckGo" in search_provider:
+            ddg_search = DuckDuckGoSearchRun()
+            tools.append(Tool(
+                name="web_search",
+                func=ddg_search.run,
+                description="Search the web for current information. Use this for general queries about recent events, news, or facts."
+            ))
+        
+        if "Wikipedia" in search_provider:
+            wiki = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+            tools.append(Tool(
+                name="wikipedia",
+                func=wiki.run,
+                description="Search Wikipedia for detailed information on topics. Best for encyclopedic knowledge."
+            ))
+        
+        if "Tavily" in search_provider and st.session_state.get('tavily_key'):
+            tavily = TavilySearch(
+                api_key=st.session_state.tavily_key,
+                max_results=5,
+                topic="general"
+            )
+            tools.append(Tool(
+                name="tavily_search",
+                func=lambda q: tavily.results(q),
+                description="Advanced web search optimized for AI. Returns structured, relevant summaries."
+            ))
+        
+        # Add chemistry-specific tools for your app
+        if st.session_state.get('enable_chem_tools', False):
+            tools.extend([
+                Tool(
+                    name="qd_synthesis_advisor",
+                    func=self.qd_synthesis_advisor,
+                    description="Get advice on quantum dot synthesis conditions"
+                ),
+                Tool(
+                    name="porphyrin_synthesis_advisor",
+                    func=self.porphyrin_synthesis_advisor,
+                    description="Get advice on porphyrin synthesis conditions"
+                )
+            ])
+        
+        # Create memory
+        memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
+        )
+        
+        # Custom prompt template
+        prompt = PromptTemplate.from_template("""
+        You are an AI research assistant specializing in chemistry and materials science, 
+        with real-time web search capabilities. Answer the user's question accurately using 
+        the tools available. If you need current information, use web search. For chemical 
+        knowledge, use your training and any available chemistry tools.
+        
+        Chat History: {chat_history}
+        
+        User Question: {input}
+        
+        Thought Process: Let me think about how to best answer this...
+        {agent_scratchpad}
+        """)
+        
+        # Create agent
+        from langchain.agents import AgentType, initialize_agent
+        agent = initialize_agent(
+            tools=tools,
+            llm=llm,
+            agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+            memory=memory,
+            verbose=True,
+            handle_parsing_errors=True,
+            max_iterations=3
+        )
+        
+        return agent
+    
+    def qd_synthesis_advisor(self, query):
+        """Chemistry-specific tool for QD advice"""
+        # This would tap into your existing QD knowledge base
+        return "Based on your data, consider precursor ratio 0.8-1.2 at 180-220°C."
+    
+    def porphyrin_synthesis_advisor(self, query):
+        """Chemistry-specific tool for porphyrin advice"""
+        return "For porphyrins, try Lindsey method with BF3 catalyst at room temperature."
+    
+    def render_ui(self):
+        """Render the AI Assistant UI in Streamlit"""
+        
+        st.markdown("<h2 class='sub-header'>🤖 AI Research Assistant</h2>", unsafe_allow_html=True)
+        
+        # Sidebar configuration
+        with st.sidebar.expander("⚙️ Assistant Settings", expanded=False):
+            st.markdown("#### API Configuration")
+            
+            # API Key inputs
+            openai_key = st.text_input(
+                "OpenAI API Key",
+                type="password",
+                help="Get your key from platform.openai.com"
+            )
+            
+            tavily_key = st.text_input(
+                "Tavily API Key (Optional)",
+                type="password",
+                help="Get free credits at tavily.com"
+            )
+            
+            if tavily_key:
+                st.session_state.tavily_key = tavily_key
+            
+            # Model selection
+            model_choice = st.selectbox(
+                "AI Model",
+                ["OpenAI GPT-4", "OpenAI GPT-3.5"],
+                help="GPT-4 is more capable but slower"
+            )
+            
+            # Search providers
+            search_provider = st.multiselect(
+                "Search Providers",
+                ["DuckDuckGo", "Wikipedia", "Tavily"],
+                default=["DuckDuckGo", "Wikipedia"]
+            )
+            
+            # Chemistry tools
+            st.session_state.enable_chem_tools = st.checkbox(
+                "Enable Chemistry Tools",
+                value=True,
+                help="Add QD and porphyrin synthesis advisors"
+            )
+            
+            # Initialize button
+            if st.button("🚀 Initialize Assistant", use_container_width=True):
+                if openai_key:
+                    with st.spinner("Setting up AI assistant..."):
+                        try:
+                            st.session_state.agent_executor = self.setup_agent(
+                                openai_key, model_choice, search_provider
+                            )
+                            st.session_state.assistant_initialized = True
+                            st.success("✅ Assistant ready!")
+                        except Exception as e:
+                            st.error(f"Setup failed: {str(e)}")
+                else:
+                    st.warning("Please enter an OpenAI API key")
+        
+        # Main chat interface
+        if st.session_state.assistant_initialized:
+            # Display chat messages
+            for message in st.session_state.assistant_messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+                    
+                    # Show sources if available
+                    if "sources" in message:
+                        with st.expander("📚 Sources"):
+                            for source in message["sources"]:
+                                st.markdown(f"- [{source['title']}]({source['url']})")
+            
+            # Chat input
+            if prompt := st.chat_input("Ask about synthesis, current research, or any topic..."):
+                # Add user message
+                st.session_state.assistant_messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                
+                # Get assistant response
+                with st.chat_message("assistant"):
+                    with st.spinner("Researching..."):
+                        try:
+                            # Run the agent
+                            response = st.session_state.agent_executor.invoke({
+                                "input": prompt
+                            })
+                            
+                            output = response['output']
+                            
+                            # Extract sources if available (simplified)
+                            sources = []
+                            if "tavily" in str(response).lower():
+                                sources.append({
+                                    "title": "Web Search Results",
+                                    "url": "#"
+                                })
+                            
+                            st.markdown(output)
+                            
+                            # Show sources
+                            if sources:
+                                with st.expander("📚 Sources"):
+                                    for source in sources:
+                                        st.markdown(f"- {source['title']}")
+                            
+                            # Save to session
+                            st.session_state.assistant_messages.append({
+                                "role": "assistant",
+                                "content": output,
+                                "sources": sources
+                            })
+                            
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+            
+            # Clear chat button
+            if st.button("🗑️ Clear Chat"):
+                st.session_state.assistant_messages = []
+                st.rerun()
+        
+        else:
+            # Show welcome message when not initialized
+            st.info("👈 Configure your API key in the sidebar to start chatting with web search capabilities.")
+            
+            # Show example questions
+            with st.expander("💡 Example Questions"):
+                st.markdown("""
+                - "What are the latest developments in quantum dot synthesis?"
+                - "Show me recent papers on porphyrin-based PDT"
+                - "What's the current best method for high-PLQY CIS/ZnS QDs?"
+                - "Tell me about new AI models for molecular generation"
+                - "What's the weather like today?" (demonstrates web search)
+                """)
+# ============================================================================
 # Tab: AI Assistant (unchanged)
 # ============================================================================
 # ============================================================================
@@ -1996,7 +2274,7 @@ def main():
         else:
             st.markdown("<div class='sidebar-logo'><div style='font-size:3rem;'>🧪</div><div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div></div>", unsafe_allow_html=True)
         st.markdown("---")
-        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator","📊 Advanced Visualization","AI Assistant"])
+        mode = st.radio("Mode", ["Quantum Dots","Porphyrins","Multi‑Objective","Molecular Generator","📊 Advanced Visualization","🤖 AI Research Assistant","AI Assistant"])
         with st.expander("Upload Logo"):
             logo = st.file_uploader("Image", type=['png','jpg','jpeg','gif'])
             if logo:
@@ -2019,6 +2297,9 @@ def main():
         display_molecular_generator_tab()
     elif mode == "📊 Advanced Visualization":
         display_advanced_visualization(uploaded_file)
+    elif mode == "🤖 AI Research Assistant":
+        assistant = AIResearchAssistant()
+        assistant.render_ui()
     else:
         display_deepseek_chatbox()
 
