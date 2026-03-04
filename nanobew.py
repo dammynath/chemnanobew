@@ -2522,7 +2522,7 @@ def main():
         display_molecular_generator_tab()
     elif mode == "📊 Advanced Visualization":
         display_advanced_visualization(uploaded_file)
-    elif app_mode == "🤖 AI Research Assistant":
+    elif mode == "🤖 AI Research Assistant":
         assistant = AIResearchAssistant()
         assistant.render_ui()
     else:
