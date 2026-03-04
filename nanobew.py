@@ -2487,54 +2487,162 @@ def display_ai_assistant():
 
 
 # ============================================================================
-# Main function - COMPLETE FIXED VERSION
+# Main function - COMPLETELY FIXED
 # ============================================================================
 def main():
+    # Check if we have the required display functions
+    # This is a safety check to avoid crashes
+    required_functions = [
+        'display_quantum_dots_tab',
+        'display_porphyrins_tab', 
+        'display_multi_objective_tab',
+        'display_molecular_generator_tab',
+        'display_advanced_visualization',
+        'display_ai_assistant'
+    ]
+    
+    # Verify all required functions exist
+    for func_name in required_functions:
+        if func_name not in globals():
+            st.error(f"❌ Critical error: Function '{func_name}' is not defined. Please check your code.")
+            st.stop()
+    
     with st.sidebar:
+        # Display logo
         if os.path.exists("images") and os.listdir("images"):
             st.image(os.path.join("images", os.listdir("images")[0]), use_container_width=True)
         else:
-            st.markdown("<div class='sidebar-logo'><div style='font-size:3rem;'>🧪</div><div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div></div>", unsafe_allow_html=True)
+            st.markdown("""
+            <div class='sidebar-logo'>
+                <div style='font-size:3rem;'>🧪</div>
+                <div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div>
+                <div style='color:#ecf0f1; font-size:0.9rem;'>LABORATORY</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         st.markdown("---")
         
-        # Two separate AI assistant options - clearly differentiated
-        mode = st.radio("Mode", [
-            "Quantum Dots",
-            "Porphyrins", 
-            "Multi‑Objective",
-            "Molecular Generator",
-            "📊 Advanced Visualization",
-            "🤖 AI Research Assistant (Web Search)",  # Brave/Tavily assistant with web search
-            "💬 ChemNanoBot (Synthesis Expert)"      # Simple rule-based chatbot
-        ])
+        # CLEAN MODE SELECTION - No duplicates, clear labels
+        mode = st.radio(
+            "Select Mode",
+            [
+                "🧪 Quantum Dots",
+                "🔬 Porphyrins", 
+                "🎯 Multi-Objective",
+                "🧬 Molecular Generator",
+                "📊 Advanced Visualization",
+                "🤖 AI Research Assistant",  # Brave/Tavily web search assistant
+                "💬 ChemNanoBot"              # Rule-based synthesis expert
+            ],
+            key="navigation_mode"
+        )
         
-        with st.expander("Upload Logo"):
-            logo = st.file_uploader("Image", type=['png','jpg','jpeg','gif'])
-            if logo:
-                save_uploaded_image(logo)
-                st.rerun()
-        uploaded_file = st.file_uploader("Upload CSV", type=['csv'])
         st.markdown("---")
-        st.info("CHEM‑NANO‑BEW Lab • v2.1 (RDKit‑Mode)")
+        
+        # Logo upload section
+        with st.expander("📸 Upload Logo"):
+            logo = st.file_uploader("Choose image", type=['png','jpg','jpeg','gif'], key="logo_uploader")
+            if logo is not None:
+                saved_path = save_uploaded_image(logo)
+                if saved_path:
+                    st.success("✅ Logo uploaded! Refresh to see changes.")
+                    st.rerun()
+        
+        st.markdown("---")
+        
+        # Data upload section
+        st.markdown("## 📁 Data Management")
+        uploaded_file = st.file_uploader("Upload CSV data", type=['csv'], key="data_uploader")
+        
+        if uploaded_file is not None:
+            st.success(f"✅ Loaded: {uploaded_file.name}")
+        
+        st.markdown("---")
+        
+        # About section
+        st.markdown("## ℹ️ About")
+        st.info(
+            "**CHEM‑NANO‑BEW Laboratory**\n\n"
+            "Advanced synthesis optimization for "
+            "quantum dots and porphyrins using "
+            "machine learning and DoE.\n\n"
+            f"**Version:** 2.1 (RDKit Mode)"
+        )
+        
+        # API Status (if AI assistant is selected)
+        if 'api_status' in st.session_state:
+            with st.expander("🔌 API Status"):
+                status = st.session_state.api_status
+                st.write(f"Brave: {'✅' if status.get('brave') else '❌'}")
+                st.write(f"Tavily: {'✅' if status.get('tavily') else '❌'}")
+                st.write(f"OpenAI: {'✅' if status.get('openai') else '❌'}")
 
-    st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
+    # Main content area - Header
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
 
-    # Route to appropriate tab
-    if mode == "Quantum Dots":
-        display_quantum_dots_tab(uploaded_file)
-    elif mode == "Porphyrins":
-        display_porphyrins_tab(uploaded_file)
-    elif mode == "Multi‑Objective":
-        display_multi_objective_tab()
-    elif mode == "Molecular Generator":
-        display_molecular_generator_tab()
-    elif mode == "📊 Advanced Visualization":
-        display_advanced_visualization(uploaded_file)
-    elif mode == "🤖 AI Research Assistant (Web Search)":
-        assistant = AIResearchAssistant()
-        assistant.render_ui()
-    elif mode == "💬 ChemNanoBot (Synthesis Expert)":
-        display_ai_assistant()
+    # Route to appropriate tab based on selection
+    try:
+        # Strip emoji for function routing (or keep as is)
+        if mode == "🧪 Quantum Dots":
+            display_quantum_dots_tab(uploaded_file)
+            
+        elif mode == "🔬 Porphyrins":
+            display_porphyrins_tab(uploaded_file)
+            
+        elif mode == "🎯 Multi-Objective":
+            display_multi_objective_tab()
+            
+        elif mode == "🧬 Molecular Generator":
+            display_molecular_generator_tab()
+            
+        elif mode == "📊 Advanced Visualization":
+            display_advanced_visualization(uploaded_file)
+            
+        elif mode == "🤖 AI Research Assistant":
+            # Initialize and render the web-search AI assistant
+            if 'ai_research_assistant' not in st.session_state:
+                st.session_state.ai_research_assistant = AIResearchAssistant()
+            st.session_state.ai_research_assistant.render_ui()
+            
+        elif mode == "💬 ChemNanoBot":
+            # Render the rule-based synthesis expert
+            display_ai_assistant()
+            
+        else:
+            st.error(f"Unknown mode selected: {mode}")
+            
+    except Exception as e:
+        st.error(f"⚠️ An error occurred while loading the {mode} tab:")
+        st.exception(e)
+        st.info("Please check the console logs for more details or refresh the page.")
 
-    st.markdown("<div class='footer'>Powered by CHEMNANOBEW GROUP • RDKit‑Mode version</div>", unsafe_allow_html=True)
+    # Footer
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("""
+        <div style='text-align: center; color: #7f8c8d; padding: 1rem;'>
+            <p>Powered by CHEMNANOBEW GROUP • v2.1 (RDKit Mode)</p>
+            <p style='font-size: 0.8rem;'>© 2024 CHEM-NANO-BEW Laboratory</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# Make sure this is at the very end of your file
+if __name__ == "__main__":
+    # Add a safety wrapper
+    try:
+        main()
+    except Exception as e:
+        st.error("🚨 **Critical Application Error**")
+        st.exception(e)
+        st.markdown("""
+        ### Troubleshooting Steps:
+        1. Check that all required functions are defined
+        2. Verify your API keys in `.streamlit/secrets.toml`
+        3. Check the console/terminal for detailed error messages
+        4. Try refreshing the page
+        """)
