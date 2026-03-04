@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestRegressor
 #from skopt import gp_minimize
-from skopt.space import Real
+#from skopt.space import Real
 import base64
 from PIL import Image
 import os
