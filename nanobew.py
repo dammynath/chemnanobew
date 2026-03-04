@@ -2723,7 +2723,7 @@ def main():
         display_advanced_visualization(uploaded_file)
     elif mode == "🤖 AI Research Assistant":
         assistant = AIResearchAssistant()
-        assistant.render_ui()
+        assistant.render_ui(self)
     else:
         display_deepseek_chatbox()
 
