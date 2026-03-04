@@ -39,6 +39,19 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
 from scipy import stats
 
+# Add to your existing helper functions
+def normalize_series(series):
+    """Normalize a pandas series to [0,1] range"""
+    return (series - series.min()) / (series.max() - series.min() + 1e-6)
+
+
+def calculate_composite_score(df, weights):
+    """Calculate composite score from multiple objectives"""
+    score = 0
+    for prop, weight in weights.items():
+        if prop in df.columns:
+            score += weight * normalize_series(df[prop])
+    return score
 # ============================================================================
 # Page config (must be first)
 # ============================================================================
