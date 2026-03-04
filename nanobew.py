@@ -274,24 +274,35 @@ class MolecularUtils:
         return [base[i] for i in indices]
 
 # ============================================================================
-# Tab: Quantum Dots (unchanged, uses DataManager)
+# Tab: Quantum Dots
 # ============================================================================
 def display_quantum_dots_tab(uploaded_file):
     st.markdown("<h2 class='sub-header'>CIS/ZnS Quantum Dot Synthesis Optimization</h2>", unsafe_allow_html=True)
+    
     # Safely load data
-if uploaded_file is not None:
-    data = DataManager.load_data(uploaded_file)
-    if data is None:
-        st.warning("Could not load uploaded file. Using sample data instead.")
+    if uploaded_file is not None:
+        data = DataManager.load_data(uploaded_file)
+        if data is None:
+            st.warning("⚠️ Could not load uploaded file. Using sample data instead.")
+            data = DataManager.create_sample_qd_data(50)
+    else:
         data = DataManager.create_sample_qd_data(50)
-else:
-    data = DataManager.create_sample_qd_data(50)
-    st.info("📊 Using sample data. Upload your own CSV for real optimization.")
-    if data is None:
-        st.error("No data available")
-    return
-
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Data Explorer", "🔬 Optimization", "📈 Visualization", "👨‍🔬CIS-Te/ZnS Optimizer", "📥 Export"])
+        st.info("📊 Using sample data. Upload your own CSV for real optimization.")
+    
+    # Check if data is valid
+    if data is None or len(data) == 0:
+        st.error("❌ No data available")
+        return
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Data Explorer", 
+        "🔬 Optimization", 
+        "📈 Visualization", 
+        "👨‍🔬 CIS-Te/ZnS Optimizer", 
+        "📥 Export"
+    ])
+    
     with tab1:
         col1, col2 = st.columns([2,1])
         with col1:
@@ -300,78 +311,223 @@ else:
                 st.dataframe(data.describe())
         with col2:
             st.metric("Total Experiments", len(data))
-            for t in ['absorption_nm','plqy_percent','pce_percent','soq_au']:
-                if t in data:
+            for t in ['absorption_nm', 'plqy_percent', 'pce_percent', 'soq_au']:
+                if t in data.columns:
                     st.metric(f"Best {t}", f"{data[t].max():.1f}")
+    
     with tab2:
-        st.markdown("### Optimization Settings")
-        target = st.selectbox("Target Property", [c for c in data.columns if c not in ['surfactant','solvent']])
-        if st.button("Run Optimization"):
+        st.markdown("### 🔧 Optimization Settings")
+        target = st.selectbox(
+            "Target Property", 
+            [c for c in data.columns if c not in ['surfactant', 'solvent']]
+        )
+        if st.button("🚀 Run Optimization"):
             with st.spinner("Optimizing..."):
                 time.sleep(2)
-                best = data[target].max() * (1 + np.random.uniform(0.05,0.15))
-                st.success(f"Optimal value: {best:.2f}")
+                best = data[target].max() * (1 + np.random.uniform(0.05, 0.15))
+                st.success(f"✅ Optimal value: {best:.2f}")
+    
     with tab3:
         num_cols = data.select_dtypes(include=np.number).columns.tolist()
         if num_cols:
             x = st.selectbox("X axis", num_cols, index=0)
-            y = st.selectbox("Y axis", num_cols, index=min(1,len(num_cols)-1))
+            y = st.selectbox("Y axis", num_cols, index=min(1, len(num_cols)-1))
             fig = px.scatter(data, x=x, y=y, trendline="lowess")
             st.plotly_chart(fig)
-    with tab4: # CIS-Te/ZnS Optimizer
-
-        st.header("CIS-Te/ZnS Optimizer")
-
-        pH = st.slider("pH",2.5,6.0,(3.0,5.0))
-        Te = st.slider("Te (g)",0.0012,0.0022,(0.0016,0.0020))
-        Zn = st.slider("ZnAc (g)",0.02,0.04,(0.025,0.035))
-        shell = st.slider("Shell time",10,60,(15,45))
-
-        ranges={
-            "pH":pH,
-            "Te":Te,
-            "Zn":Zn,
-            "shell":shell
-        }
-
-        uploaded = st.file_uploader("Upload experimental CSV", type="csv")
-
-        if uploaded:
-            df = pd.read_csv(uploaded)
-            st.success("Using real data")
         else:
-            df = generate_doe(ranges,40)
-            df["wavelength"]=720+250*df["Te"]+0.4*df["shell"]
-            df["intensity"]=15000+5000*(df["pH"]-4)
-
-        st.dataframe(df)
-
-        model=train_rf(df,["wavelength","intensity"])
-
-        if st.button("Run Bayesian Optimization"):
-            best = bayes_optimize(model,ranges,["wavelength","intensity"])
-            st.success(best)
-
-        if st.button("Show Pareto Front"):
-            pf=pareto_front(df,["wavelength","intensity"])
-            fig=px.scatter(df,x="wavelength",y="intensity")
-            fig.add_scatter(x=pf["wavelength"],y=pf["intensity"],mode="markers")
-            st.plotly_chart(fig)
-
-        if st.button("RL Suggest Next Experiment"):
-            hist=df.copy()
-            hist["reward"]=hist["wavelength"]+hist["intensity"]/1000
-            st.write(rl_suggest(hist,ranges))
-
-    if HAS_OPTUNA:
-        best = bayes_optimize(model,ranges)
-    else:
-        st.warning("Optuna not installed — using random search instead")
-        best = generate_doe(ranges,1000).iloc[0]
+            st.warning("No numeric columns available for visualization")
+    
+    with tab4:  # CIS-Te/ZnS Optimizer
+        st.header("🧪 CIS-Te/ZnS Optimizer")
+        
+        # Define parameter ranges
+        pH = st.slider("pH Range", 2.5, 6.0, (3.0, 5.0))
+        Te = st.slider("Te (g) Range", 0.0012, 0.0022, (0.0016, 0.0020))
+        Zn = st.slider("ZnAc (g) Range", 0.02, 0.04, (0.025, 0.035))
+        shell = st.slider("Shell time (min) Range", 10, 60, (15, 45))
+        
+        ranges = {
+            "pH": pH,
+            "Te": Te,
+            "Zn": Zn,
+            "shell": shell
+        }
+        
+        # Load or generate data
+        uploaded = st.file_uploader("Upload experimental CSV for Te/ZnS", type="csv", key="te_upload")
+        
+        if uploaded is not None:
+            try:
+                df = pd.read_csv(uploaded)
+                st.success("✅ Using uploaded experimental data")
+            except Exception as e:
+                st.error(f"Error loading file: {e}")
+                df = generate_doe_data(ranges, 40)
+                df["wavelength"] = 720 + 250 * df["Te"] + 0.4 * df["shell"]
+                df["intensity"] = 15000 + 5000 * (df["pH"] - 4)
+        else:
+            with st.spinner("Generating synthetic DOE data..."):
+                df = generate_doe_data(ranges, 40)
+                df["wavelength"] = 720 + 250 * df["Te"] + 0.4 * df["shell"]
+                df["intensity"] = 15000 + 5000 * (df["pH"] - 4)
+            st.info("📊 Using synthetic DOE data. Upload your own CSV for real optimization.")
+        
+        st.dataframe(df.head(10), use_container_width=True)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🎯 Train RF Model", use_container_width=True):
+                with st.spinner("Training Random Forest model..."):
+                    model = train_random_forest(df, ["wavelength", "intensity"])
+                    st.session_state['rf_model'] = model
+                    st.success("✅ Model trained successfully!")
+        
+        with col2:
+            if st.button("🚀 Run Bayesian Optimization", use_container_width=True):
+                if 'rf_model' in st.session_state:
+                    with st.spinner("Optimizing..."):
+                        best = bayesian_optimize(st.session_state['rf_model'], ranges, ["wavelength", "intensity"])
+                        st.success(f"✅ Optimal conditions found:")
+                        for k, v in best.items():
+                            st.metric(k, f"{v:.4f}" if isinstance(v, float) else v)
+                else:
+                    st.warning("⚠️ Please train a model first")
+        
+        with col3:
+            if st.button("📊 Show Pareto Front", use_container_width=True):
+                pf = calculate_pareto_front(df, ["wavelength", "intensity"])
+                fig = px.scatter(df, x="wavelength", y="intensity", 
+                               title="Pareto Front Analysis",
+                               labels={"wavelength": "Wavelength (nm)", "intensity": "Intensity (a.u.)"})
+                fig.add_scatter(x=pf["wavelength"], y=pf["intensity"], 
+                              mode="markers", name="Pareto Front",
+                              marker=dict(color="red", size=10, symbol="star"))
+                st.plotly_chart(fig, use_container_width=True)
+        
+        if st.button("🤖 RL Suggest Next Experiment", use_container_width=True):
+            hist = df.copy()
+            hist["reward"] = hist["wavelength"] + hist["intensity"] / 1000
+            suggestion = rl_suggest_experiment(hist, ranges)
+            st.success("🔮 Next suggested experiment:")
+            for k, v in suggestion.items():
+                st.metric(k, f"{v:.4f}" if isinstance(v, float) else v)
+    
     with tab5:
+        st.markdown("### 📥 Export Data")
         csv = data.to_csv(index=False)
-        st.download_button("Download CSV", csv, "qd_data.csv", "text/csv")
+        st.download_button(
+            label="📥 Download CSV",
+            data=csv,
+            file_name=f"qd_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 
+
+# ============================================================================
+# Helper functions for CIS-Te/ZnS Optimizer
+# ============================================================================
+
+def generate_doe_data(ranges, n_samples=40):
+    """Generate synthetic DOE data based on parameter ranges"""
+    np.random.seed(42)
+    data = {}
+    for param, (low, high) in ranges.items():
+        data[param] = np.random.uniform(low, high, n_samples)
+    return pd.DataFrame(data)
+
+
+def train_random_forest(df, target_cols):
+    """Train a Random Forest model on the data"""
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.model_selection import train_test_split
+    
+    # Prepare features and targets
+    feature_cols = [c for c in df.columns if c not in target_cols]
+    X = df[feature_cols].values
+    y = df[target_cols[0]].values  # Use first target for simplicity
+    
+    # Train model
+    model = RandomForestRegressor(n_estimators=50, random_state=42)
+    model.fit(X, y)
+    
+    return model
+
+
+def bayesian_optimize(model, ranges, target_cols):
+    """Simple Bayesian optimization placeholder"""
+    from skopt import gp_minimize
+    from skopt.space import Real
+    
+    # Define search space
+    dimensions = []
+    param_names = []
+    for param, (low, high) in ranges.items():
+        dimensions.append(Real(low, high, name=param))
+        param_names.append(param)
+    
+    # Define objective function
+    def objective(x):
+        x_array = np.array(x).reshape(1, -1)
+        # Negative because we want to maximize
+        return -model.predict(x_array)[0]
+    
+    # Run optimization
+    result = gp_minimize(
+        objective, 
+        dimensions, 
+        n_calls=20, 
+        n_initial_points=5,
+        random_state=42
+    )
+    
+    # Return best parameters
+    best_params = {}
+    for i, name in enumerate(param_names):
+        best_params[name] = result.x[i]
+    
+    return best_params
+
+
+def calculate_pareto_front(df, objective_cols):
+    """Calculate Pareto front for two objectives"""
+    objectives = df[objective_cols].values
+    n_points = len(objectives)
+    is_pareto = np.ones(n_points, dtype=bool)
+    
+    for i in range(n_points):
+        for j in range(n_points):
+            if i != j:
+                if (objectives[j, 0] >= objectives[i, 0] and 
+                    objectives[j, 1] >= objectives[i, 1] and
+                    (objectives[j, 0] > objectives[i, 0] or 
+                     objectives[j, 1] > objectives[i, 1])):
+                    is_pareto[i] = False
+                    break
+    
+    return df[is_pareto].reset_index(drop=True)
+
+
+def rl_suggest_experiment(history, ranges):
+    """Simple RL-inspired experiment suggestion"""
+    # Find best performing experiment so far
+    best_idx = history["reward"].idxmax()
+    best_params = history.loc[best_idx, [c for c in history.columns if c in ranges.keys()]]
+    
+    # Add small random perturbation for exploration
+    suggestion = {}
+    for param, (low, high) in ranges.items():
+        if param in best_params.index:
+            # Add 10% random noise
+            noise = np.random.normal(0, (high - low) * 0.1)
+            value = best_params[param] + noise
+            # Clip to bounds
+            suggestion[param] = np.clip(value, low, high)
+        else:
+            suggestion[param] = np.random.uniform(low, high)
+    
+    return suggestion
 # ============================================================================
 # Tab: Porphyrins (unchanged except property prediction now uses MolecularUtils)
 # ============================================================================
