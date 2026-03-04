@@ -2725,9 +2725,11 @@ def main():
         display_molecular_generator_tab()
     elif mode == "📊 Advanced Visualization":
         display_advanced_visualization(uploaded_file)
-    elif mode == "🤖 AI Research Assistant":
-        assistant = AIResearchAssistant()
-        assistant.render_ui()
+     elif mode == "🤖 AI Research Assistant":
+         test_assistant()  # or directly: assistant = AIResearchAssistant(); assistant.render_ui()
+   # elif mode == "🤖 AI Research Assistant":
+    #    assistant = AIResearchAssistant()
+     #   assistant.render_ui()
     else:
         display_deepseek_chatbox()
 
