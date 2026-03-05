@@ -1849,8 +1849,8 @@ def display_pce_tab():
         # ========================================================================
 # Tab 1: Data Input - FIXED ENCODING
 # ========================================================================
-with pce_tabs[0]:
-    col1, col2 = st.columns([1, 1])
+    with pce_tabs[0]:
+        col1, col2 = st.columns([1, 1])
     
     with col1:
         st.markdown("### 📁 Data Source")
