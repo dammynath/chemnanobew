@@ -1846,36 +1846,60 @@ def display_pce_tab():
     # ========================================================================
     # Tab 1: Data Input
     # ========================================================================
-    with pce_tabs[0]:
-        col1, col2 = st.columns([1, 1])
+# ========================================================================
+# Tab 1: Data Input - FIXED ENCODING
+# ========================================================================
+with pce_tabs[0]:
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("### 📁 Data Source")
         
-        with col1:
-            st.markdown("### 📁 Data Source")
-            
-            data_source = st.radio(
-                "Select data source:",
-                ["Use Sample Data (PCE=26%)", "Upload Custom CSV"],
-                key="pce_data_source"
+        data_source = st.radio(
+            "Select data source:",
+            ["Use Sample Data (PCE=26%)", "Upload Custom CSV"],
+            key="pce_data_source"
+        )
+        
+        if data_source == "Upload Custom CSV":
+            uploaded_file = st.file_uploader(
+                "Upload time-temperature CSV",
+                type=['csv'],
+                key="pce_uploader"
             )
-            
-            if data_source == "Upload Custom CSV":
-                uploaded_file = st.file_uploader(
-                    "Upload time-temperature CSV",
-                    type=['csv'],
-                    key="pce_uploader"
-                )
-                if uploaded_file is not None:
+            if uploaded_file is not None:
+                # Try multiple encodings
+                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'cp437']
+                df = None
+                
+                for encoding in encodings:
                     try:
-                        df = pd.read_csv(uploaded_file)
-                        st.success(f"✅ Loaded: {uploaded_file.name}")
+                        uploaded_file.seek(0)
+                        df = pd.read_csv(uploaded_file, encoding=encoding)
+                        st.success(f"✅ Loaded with {encoding} encoding")
+                        break
+                    except UnicodeDecodeError:
+                        continue
                     except Exception as e:
-                        st.error(f"Error loading file: {e}")
-                        df = None
-                else:
+                        continue
+                
+                if df is None:
+                    st.error("Could not read file. Please check the file format.")
                     df = None
+                else:
+                    # Clean column names
+                    df.columns = [col.replace('癈', '°C').replace('â', '°C') for col in df.columns]
+                    
+                    # Ensure correct column names
+                    if len(df.columns) >= 2:
+                        df.columns = ['time_h', 'temperature_°C'] + list(df.columns[2:])
+                    
+                    st.session_state['pce_data'] = df
             else:
-                # Use the attached sample data
-                sample_data = """time_h,temperature_°C
+                df = st.session_state.get('pce_data', None)
+        else:
+            # Use sample data with proper encoding
+            sample_data = """time_h,temperature_°C
 0,20
 0.5,21.8
 1,23.3
@@ -2071,10 +2095,12 @@ def display_pce_tab():
 96,20
 96.5,20
 97,20"""
+            
+            df = pd.read_csv(io.StringIO(sample_data))
+            st.info("📊 Using sample data with expected PCE = 26%")
+            st.session_state['pce_data'] = df
                 
-                # Convert string to DataFrame
-                df = pd.read_csv(io.StringIO(sample_data))
-                st.info("📊 Using sample data with expected PCE = 26%")
+               
             
             if df is not None:
                 st.session_state['pce_data'] = df
@@ -3578,7 +3604,7 @@ def main():
     with st.sidebar:
         # Display logo
         if os.path.exists("images") and os.listdir("images"):
-            st.image(os.path.join("images", os.listdir("images")[0]), use_container_width=True)
+            st.image(os.path.join("images", os.listdir("images")[0]), use_column_width=True)
         else:
             st.markdown("""
             <div class='sidebar-logo'>
