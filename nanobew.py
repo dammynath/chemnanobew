@@ -1969,12 +1969,6 @@ class AIResearchAssistant:
             st.markdown("#### API Configuration")
             
             # API Key inputs
-            openai_key = st.text_input(
-                "OpenAI API Key",
-                type="password",
-                help="Get your key from platform.openai.com"
-            )
-            
             tavily_key = st.text_input(
                 "Tavily API Key (Optional)",
                 type="password",
@@ -1984,6 +1978,12 @@ class AIResearchAssistant:
             if tavily_key:
                 st.session_state.tavily_key = tavily_key
             
+            openai_key = st.text_input(
+                "OpenAI API Key",
+                type="password",
+                help="Get your key from platform.openai.com"
+            )
+                                
             # Model selection
             model_choice = st.selectbox(
                 "AI Model",
