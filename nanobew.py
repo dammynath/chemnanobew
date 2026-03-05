@@ -1830,11 +1830,30 @@ import os
 from datetime import datetime
 import json
 
+# ============================================================================
+# AI Research Assistant with Brave & Tavily as Primary (OpenAI Optional)
+# ============================================================================
+import streamlit as st
+import requests
+import json
+import time
+from datetime import datetime
+import os
+
+# Optional imports with fallbacks
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAI = None
+
 class AIResearchAssistant:
-    """AI Assistant with real-time web search capabilities"""
+    """AI Assistant with Brave and Tavily as primary search engines (OpenAI optional)"""
     
     def __init__(self):
         self.initialize_session_state()
+        self.setup_providers()
     
     def initialize_session_state(self):
         """Initialize session state variables"""
@@ -1842,249 +1861,426 @@ class AIResearchAssistant:
             st.session_state.assistant_messages = []
         if 'assistant_initialized' not in st.session_state:
             st.session_state.assistant_initialized = False
-        if 'agent_executor' not in st.session_state:
-            st.session_state.agent_executor = None
+        if 'brave_key' not in st.session_state:
+            st.session_state.brave_key = None
+        if 'tavily_key' not in st.session_state:
+            st.session_state.tavily_key = None
+        if 'openai_key' not in st.session_state:
+            st.session_state.openai_key = None
+        if 'api_status' not in st.session_state:
+            st.session_state.api_status = {
+                'brave': False,
+                'tavily': False,
+                'openai': False
+            }
     
-    def setup_agent(self, api_key, model_choice, search_provider):
-        """Setup the LangChain agent with tools"""
+    def setup_providers(self):
+        """Check for API keys in secrets (optional)"""
+        # Check for Brave key in secrets
+        if 'BRAVE_API_KEY' in st.secrets:
+            st.session_state.brave_key = st.secrets['BRAVE_API_KEY']
+            st.session_state.api_status['brave'] = True
         
-        # Initialize LLM
-        if model_choice == "OpenAI GPT-4":
-            llm = ChatOpenAI(
-                model="gpt-4-turbo-preview",
-                temperature=0.7,
-                api_key=api_key
-            )
-        elif model_choice == "OpenAI GPT-3.5":
-            llm = ChatOpenAI(
-                model="gpt-3.5-turbo",
-                temperature=0.7,
-                api_key=api_key
-            )
-        else:
-            # Default to GPT-3.5
-            llm = ChatOpenAI(
-                model="gpt-3.5-turbo",
-                temperature=0.7,
-                api_key=api_key
-            )
+        # Check for Tavily key in secrets
+        if 'TAVILY_API_KEY' in st.secrets:
+            st.session_state.tavily_key = st.secrets['TAVILY_API_KEY']
+            st.session_state.api_status['tavily'] = True
         
-        # Initialize tools based on selection
-        tools = []
+        # Check for OpenAI key in secrets (optional)
+        if 'OPENAI_API_KEY' in st.secrets:
+            st.session_state.openai_key = st.secrets['OPENAI_API_KEY']
+            st.session_state.api_status['openai'] = True
+    
+    # ========================================================================
+    # Brave Search Methods
+    # ========================================================================
+    def brave_web_search(self, query, count=5):
+        """Search using Brave Web Search API"""
+        if not st.session_state.brave_key:
+            return None
         
-        if "DuckDuckGo" in search_provider:
-            ddg_search = DuckDuckGoSearchRun()
-            tools.append(Tool(
-                name="web_search",
-                func=ddg_search.run,
-                description="Search the web for current information. Use this for general queries about recent events, news, or facts."
-            ))
+        url = "https://api.search.brave.com/res/v1/web/search"
+        headers = {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": st.session_state.brave_key
+        }
+        params = {
+            "q": query,
+            "count": count,
+            "search_lang": "en",
+            "text_format": "raw",
+            "safesearch": "off"
+        }
         
-        if "Wikipedia" in search_provider:
-            wiki = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
-            tools.append(Tool(
-                name="wikipedia",
-                func=wiki.run,
-                description="Search Wikipedia for detailed information on topics. Best for encyclopedic knowledge."
-            ))
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+        except Exception as e:
+            st.warning(f"Brave Search error: {str(e)}")
+            return None
+    
+    def brave_news_search(self, query, count=5):
+        """Search news using Brave News API"""
+        if not st.session_state.brave_key:
+            return None
         
-        if "Tavily" in search_provider and st.session_state.get('tavily_key'):
-            tavily = TavilySearch(
-                api_key=st.session_state.tavily_key,
-                max_results=5,
-                topic="general"
-            )
-            tools.append(Tool(
-                name="tavily_search",
-                func=lambda q: tavily.results(q),
-                description="Advanced web search optimized for AI. Returns structured, relevant summaries."
-            ))
+        url = "https://api.search.brave.com/res/v1/news/search"
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": st.session_state.brave_key
+        }
+        params = {
+            "q": query,
+            "count": count,
+            "search_lang": "en"
+        }
         
-        # Add chemistry-specific tools for your app
-        if st.session_state.get('enable_chem_tools', False):
-            tools.extend([
-                Tool(
-                    name="qd_synthesis_advisor",
-                    func=self.qd_synthesis_advisor,
-                    description="Get advice on quantum dot synthesis conditions"
-                ),
-                Tool(
-                    name="porphyrin_synthesis_advisor",
-                    func=self.porphyrin_synthesis_advisor,
-                    description="Get advice on porphyrin synthesis conditions"
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            return None
+        except Exception:
+            return None
+    
+    def brave_summarizer(self, query):
+        """Get AI-ready context using Brave Summarizer"""
+        if not st.session_state.brave_key:
+            return None
+        
+        url = "https://api.search.brave.com/res/v1/summarizer/search"
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": st.session_state.brave_key
+        }
+        params = {
+            "q": query,
+            "summary": "1"
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if 'summarizer' in data and 'summary' in data['summarizer']:
+                    return data['summarizer']['summary']
+            return None
+        except Exception:
+            return None
+    
+    # ========================================================================
+    # Tavily Search Methods
+    # ========================================================================
+    def tavily_search(self, query, search_depth="basic", max_results=5):
+        """Search using Tavily API"""
+        if not st.session_state.tavily_key:
+            return None
+        
+        url = "https://api.tavily.com/search"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {st.session_state.tavily_key}"
+        }
+        payload = {
+            "query": query,
+            "search_depth": search_depth,
+            "max_results": max_results,
+            "include_answer": True,
+            "include_raw_content": False,
+            "include_images": False
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=15)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+        except Exception as e:
+            st.warning(f"Tavily Search error: {str(e)}")
+            return None
+    
+    # ========================================================================
+    # Search Methods
+    # ========================================================================
+    def search_with_brave(self, query):
+        """Search using Brave and format results"""
+        results = self.brave_web_search(query)
+        if not results or 'web' not in results or 'results' not in results['web']:
+            return None
+        
+        formatted = {
+            'sources': [],
+            'content': '',
+            'answer': None
+        }
+        
+        for r in results['web']['results'][:3]:
+            formatted['sources'].append({
+                'title': r.get('title', ''),
+                'url': r.get('url', '#'),
+                'description': r.get('description', ''),
+                'provider': 'brave'
+            })
+            formatted['content'] += f"{r.get('description', '')}\n\n"
+        
+        return formatted
+    
+    def search_with_tavily(self, query):
+        """Search using Tavily and format results"""
+        results = self.tavily_search(query)
+        if not results:
+            return None
+        
+        formatted = {
+            'sources': [],
+            'content': '',
+            'answer': results.get('answer', None)
+        }
+        
+        if 'results' in results:
+            for r in results['results'][:3]:
+                formatted['sources'].append({
+                    'title': r.get('title', ''),
+                    'url': r.get('url', '#'),
+                    'content': r.get('content', ''),
+                    'provider': 'tavily'
+                })
+                formatted['content'] += f"{r.get('content', '')}\n\n"
+        
+        return formatted
+    
+    def search_all(self, query):
+        """Search using all available providers"""
+        results = {
+            'sources': [],
+            'content': '',
+            'answer': None
+        }
+        
+        # Try Tavily first (best for Q&A)
+        if st.session_state.api_status['tavily']:
+            tavily_results = self.search_with_tavily(query)
+            if tavily_results:
+                results['sources'].extend(tavily_results['sources'])
+                results['content'] += tavily_results['content']
+                if tavily_results['answer']:
+                    results['answer'] = tavily_results['answer']
+        
+        # Try Brave for additional context
+        if st.session_state.api_status['brave']:
+            brave_results = self.search_with_brave(query)
+            if brave_results:
+                results['sources'].extend(brave_results['sources'])
+                results['content'] += brave_results['content']
+        
+        return results
+    
+    # ========================================================================
+    # Response Generation (with or without OpenAI)
+    # ========================================================================
+    def generate_response(self, query, search_results):
+        """Generate response using available AI (OpenAI optional)"""
+        
+        # Format search results
+        sources_text = ""
+        if search_results['sources']:
+            sources_text = "**Search Results:**\n\n"
+            for i, src in enumerate(search_results['sources'][:3], 1):
+                sources_text += f"{i}. **{src.get('title', 'Source')}**\n"
+                if 'description' in src:
+                    sources_text += f"   {src['description'][:200]}...\n"
+                elif 'content' in src:
+                    sources_text += f"   {src['content'][:200]}...\n"
+                sources_text += f"   URL: {src.get('url', '#')}\n\n"
+        
+        # If OpenAI is available and configured, use it
+        if (st.session_state.api_status['openai'] and 
+            st.session_state.openai_key and 
+            OPENAI_AVAILABLE):
+            
+            try:
+                client = OpenAI(api_key=st.session_state.openai_key)
+                
+                system_prompt = """You are ChemNanoBot AI, a research assistant specializing in chemistry, quantum dots, and porphyrin synthesis. 
+                Use the provided search results to answer the user's question accurately. 
+                If search results are available, base your answer on them. 
+                If no search results are available, use your general knowledge.
+                Always cite your sources when possible."""
+                
+                user_prompt = f"""Search Results:
+                {search_results['content'][:3000]}
+                
+                Question: {query}
+                
+                Please provide a comprehensive answer based on the search results above.
+                If there's a direct answer available in the Tavily results, you can use that.
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=500
                 )
-            ])
+                
+                return response.choices[0].message.content
+                
+            except Exception as e:
+                # Fall back to formatted search results if OpenAI fails
+                pass
         
-        # Create memory
-        memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True
-        )
+        # Fallback: Return formatted search results
+        response = f"**Question:** {query}\n\n"
         
-        # Custom prompt template
-        prompt = PromptTemplate.from_template("""
-        You are an AI research assistant specializing in chemistry and materials science, 
-        with real-time web search capabilities. Answer the user's question accurately using 
-        the tools available. If you need current information, use web search. For chemical 
-        knowledge, use your training and any available chemistry tools.
+        if search_results['answer']:
+            response += f"**Answer:** {search_results['answer']}\n\n"
         
-        Chat History: {chat_history}
+        if search_results['sources']:
+            response += sources_text
+        else:
+            response += "I couldn't find specific information about that query. Please try rephrasing or check your API keys."
         
-        User Question: {input}
-        
-        Thought Process: Let me think about how to best answer this...
-        {agent_scratchpad}
-        """)
-        
-        # Create agent
-        from langchain.agents import AgentType, initialize_agent
-        agent = initialize_agent(
-            tools=tools,
-            llm=llm,
-            agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-            memory=memory,
-            verbose=True,
-            handle_parsing_errors=True,
-            max_iterations=3
-        )
-        
-        return agent
+        return response
     
-    def qd_synthesis_advisor(self, query):
-        """Chemistry-specific tool for QD advice"""
-        # This would tap into your existing QD knowledge base
-        return "Based on your data, consider precursor ratio 0.8-1.2 at 180-220°C."
-    
-    def porphyrin_synthesis_advisor(self, query):
-        """Chemistry-specific tool for porphyrin advice"""
-        return "For porphyrins, try Lindsey method with BF3 catalyst at room temperature."
-    
+    # ========================================================================
+    # UI Rendering
+    # ========================================================================
     def render_ui(self):
         """Render the AI Assistant UI in Streamlit"""
         
         st.markdown("<h2 class='sub-header'>🤖 AI Research Assistant</h2>", unsafe_allow_html=True)
         
+        # API Status Display
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.session_state.api_status['brave'] or st.session_state.brave_key:
+                st.success("✅ Brave Search (Active)")
+            else:
+                st.warning("⚠️ Brave Search (Optional)")
+        with col2:
+            if st.session_state.api_status['tavily'] or st.session_state.tavily_key:
+                st.success("✅ Tavily Search (Active)")
+            else:
+                st.warning("⚠️ Tavily Search (Optional)")
+        with col3:
+            if st.session_state.api_status['openai'] or st.session_state.openai_key:
+                st.success("✅ OpenAI (Optional)")
+            else:
+                st.info("ℹ️ OpenAI (Not Required)")
+        
+        st.markdown("---")
+        
         # Sidebar configuration
-        with st.sidebar.expander("⚙️ Assistant Settings", expanded=False):
-            st.markdown("#### API Configuration")
+        with st.sidebar.expander("⚙️ Search Engine Settings", expanded=True):
+            st.markdown("#### 🔑 API Keys (Optional but Recommended)")
             
-            # API Key inputs
-            tavily_key = st.text_input(
-                "Tavily API Key (Optional)",
+            # Brave API Key
+            brave_key_input = st.text_input(
+                "Brave Search API Key",
                 type="password",
-                help="Get free credits at tavily.com"
+                value=st.session_state.brave_key if st.session_state.brave_key else "",
+                help="Get free API key from brave.com/search/api"
             )
+            if brave_key_input:
+                st.session_state.brave_key = brave_key_input
+                st.session_state.api_status['brave'] = True
             
-            if tavily_key:
-                st.session_state.tavily_key = tavily_key
-            
-            openai_key = st.text_input(
-                "OpenAI API Key",
+            # Tavily API Key
+            tavily_key_input = st.text_input(
+                "Tavily API Key",
                 type="password",
-                help="Get your key from platform.openai.com"
+                value=st.session_state.tavily_key if st.session_state.tavily_key else "",
+                help="Get free API key from tavily.com"
             )
-                                
-            # Model selection
-            model_choice = st.selectbox(
-                "AI Model",
-                ["OpenAI GPT-4", "OpenAI GPT-3.5"],
-                help="GPT-4 is more capable but slower"
-            )
+            if tavily_key_input:
+                st.session_state.tavily_key = tavily_key_input
+                st.session_state.api_status['tavily'] = True
             
-            # Search providers
-            search_provider = st.multiselect(
-                "Search Providers",
-                ["DuckDuckGo", "Wikipedia", "Tavily"],
-                default=["DuckDuckGo", "Wikipedia"]
-            )
+            # OpenAI API Key (Optional)
+            with st.expander("🤖 Optional: OpenAI for Enhanced Responses"):
+                openai_key_input = st.text_input(
+                    "OpenAI API Key (Optional)",
+                    type="password",
+                    value=st.session_state.openai_key if st.session_state.openai_key else "",
+                    help="Add for AI-powered responses. Not required for basic search."
+                )
+                if openai_key_input:
+                    st.session_state.openai_key = openai_key_input
+                    st.session_state.api_status['openai'] = True
+                    global OPENAI_AVAILABLE
+                    OPENAI_AVAILABLE = True
             
-            # Chemistry tools
-            st.session_state.enable_chem_tools = st.checkbox(
-                "Enable Chemistry Tools",
-                value=True,
-                help="Add QD and porphyrin synthesis advisors"
-            )
-            
-            # Initialize button
-            if st.button("🚀 Initialize Assistant", use_container_width=True):
-                if openai_key:
-                    with st.spinner("Setting up AI assistant..."):
-                        try:
-                            st.session_state.agent_executor = self.setup_agent(
-                                openai_key, model_choice, search_provider
-                            )
-                            st.session_state.assistant_initialized = True
-                            st.success("✅ Assistant ready!")
-                        except Exception as e:
-                            st.error(f"Setup failed: {str(e)}")
-                else:
-                    st.warning("Please enter an OpenAI API key")
+            st.markdown("---")
+            st.markdown("**Current Status:**")
+            if st.session_state.api_status['brave'] or st.session_state.api_status['tavily']:
+                st.success("✅ Search engines ready!")
+                st.session_state.assistant_initialized = True
+            else:
+                st.warning("⚠️ Add at least one search engine API key to enable web search")
         
         # Main chat interface
         if st.session_state.assistant_initialized:
-            # Display chat messages
+            # Display chat history
             for message in st.session_state.assistant_messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
-                    
-                    # Show sources if available
-                    if "sources" in message:
-                        with st.expander("📚 Sources"):
-                            for source in message["sources"]:
-                                st.markdown(f"- [{source['title']}]({source['url']})")
+                    if "sources" in message and message["sources"]:
+                        with st.expander(f"📚 Sources ({len(message['sources'])})"):
+                            for src in message["sources"]:
+                                title = src.get('title', src.get('url', 'Source'))
+                                url = src.get('url', '#')
+                                provider = src.get('provider', 'web')
+                                st.markdown(f"- [{title}]({url}) *({provider})*")
             
             # Chat input
-            if prompt := st.chat_input("Ask about synthesis, current research, or any topic..."):
+            if prompt := st.chat_input("Ask about synthesis, research, or any topic..."):
                 # Add user message
                 st.session_state.assistant_messages.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 
-                # Get assistant response
+                # Generate response
                 with st.chat_message("assistant"):
-                    with st.spinner("Researching..."):
-                        try:
-                            # Run the agent
-                            response = st.session_state.agent_executor.invoke({
-                                "input": prompt
-                            })
-                            
-                            output = response['output']
-                            
-                            # Extract sources if available (simplified)
-                            sources = []
-                            if "tavily" in str(response).lower():
-                                sources.append({
-                                    "title": "Web Search Results",
-                                    "url": "#"
-                                })
-                            
-                            st.markdown(output)
-                            
-                            # Show sources
-                            if sources:
-                                with st.expander("📚 Sources"):
-                                    for source in sources:
-                                        st.markdown(f"- {source['title']}")
-                            
-                            # Save to session
-                            st.session_state.assistant_messages.append({
-                                "role": "assistant",
-                                "content": output,
-                                "sources": sources
-                            })
-                            
-                        except Exception as e:
-                            st.error(f"Error: {str(e)}")
+                    with st.spinner("🔍 Searching..."):
+                        # Search using available engines
+                        search_results = self.search_all(prompt)
+                        
+                        # Generate response
+                        response = self.generate_response(prompt, search_results)
+                        st.markdown(response)
+                        
+                        # Show sources
+                        if search_results['sources']:
+                            with st.expander(f"📚 Sources ({len(search_results['sources'])})"):
+                                for src in search_results['sources'][:5]:
+                                    title = src.get('title', src.get('url', 'Source'))
+                                    url = src.get('url', '#')
+                                    provider = src.get('provider', 'web')
+                                    st.markdown(f"- [{title}]({url}) *({provider})*")
+                        
+                        # Save to session
+                        st.session_state.assistant_messages.append({
+                            "role": "assistant",
+                            "content": response,
+                            "sources": search_results['sources']
+                        })
             
             # Clear chat button
-            if st.button("🗑️ Clear Chat"):
+            if st.button("🗑️ Clear Chat", use_container_width=True):
                 st.session_state.assistant_messages = []
                 st.rerun()
         
         else:
-            # Show welcome message when not initialized
-            st.info("👈 Configure your API key in the sidebar to start chatting with web search capabilities.")
+            # Show welcome message
+            st.info("👈 Configure your search engine API keys in the sidebar to start searching.")
             
             # Show example questions
             with st.expander("💡 Example Questions"):
@@ -2092,8 +2288,8 @@ class AIResearchAssistant:
                 - "What are the latest developments in quantum dot synthesis?"
                 - "Show me recent papers on porphyrin-based PDT"
                 - "What's the current best method for high-PLQY CIS/ZnS QDs?"
-                - "Tell me about new AI models for molecular generation"
-                - "What's the weather like today?" (demonstrates web search)
+                - "Tell me about heavy atom effects in singlet oxygen generation"
+                - "Recent advances in photothermal therapy"
                 """)
 # ============================================================================
 # Tab: AI Assistant (unchanged)
