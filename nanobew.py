@@ -2942,7 +2942,7 @@ def main():
             'display_multi_objective_tab',
             'display_molecular_generator_tab',
             'display_advanced_visualization',
-            'display_pce_tab'
+            'display_pce_tab',
             'display_ai_assistant'
         ]
         
