@@ -2270,13 +2270,14 @@ def display_pce_tab():
             )
             
             solvent_blank_delta = st.number_input(
-                "Solvent Blank ΔT (°C)",
+                "Solvent Blank ΔQ (°C)",
                 min_value=0.0,
                 max_value=20.0,
                 value=3.5,
                 step=0.1,
+                format="%.3f",
                 key="pce_solvent",
-                help="Temperature rise of pure solvent under same conditions"
+                help="Temperature rise of pure water or solvent under same conditions"
             )
             
             # Calculate absorbed power
