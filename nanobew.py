@@ -2100,77 +2100,90 @@ def display_pce_tab():
             st.info("📊 Using sample data")
             st.session_state['pce_data'] = df
                
+                
+    # Now create two columns for preview and plot
+    if df is not None:
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.markdown("### 👁️ Data Preview")
+            st.dataframe(df.head(10), use_container_width=True)
             
-            if df is not None:
-                st.session_state['pce_data'] = df
-                
-                # Display raw data
-                st.markdown("### 👁️ Data Preview")
-                st.dataframe(df.head(10), use_container_width=True)
-                
-                # Data statistics
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Time Points", len(df))
-                with col2:
-                    st.metric("Max Temperature", f"{df['temperature_°C'].max():.1f}°C")
-                with col3:
-                    st.metric("Min Temperature", f"{df['temperature_°C'].min():.1f}°C")
+            # Statistics in a clean layout
+            st.markdown("### 📊 Statistics")
+            stats_col1, stats_col2, stats_col3 = st.columns(3)
+            with stats_col1:
+                st.metric("Total Points", len(df))
+            with stats_col2:
+                st.metric("Max Temp", f"{df['temperature_°C'].max():.1f}°C")
+            with stats_col3:
+                st.metric("Min Temp", f"{df['temperature_°C'].min():.1f}°C")
         
         with col2:
-            if df is not None:
-                st.markdown("### 📈 Raw Data Plot")
-                
-                # Identify heating and cooling phases
-                temp_peak_idx = df['temperature_°C'].idxmax()
-                peak_time = df.loc[temp_peak_idx, 'time_h']
-                peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
-                
-                fig = go.Figure()
-                
-                # Heating phase
-                fig.add_trace(go.Scatter(
-                    x=df['time_h'].iloc[:temp_peak_idx+1],
-                    y=df['temperature_°C'].iloc[:temp_peak_idx+1],
-                    mode='lines+markers',
-                    name='Heating Phase',
-                    line=dict(color='red', width=2),
-                    marker=dict(size=4)
-                ))
-                
-                # Cooling phase
-                fig.add_trace(go.Scatter(
-                    x=df['time_h'].iloc[temp_peak_idx:],
-                    y=df['temperature_°C'].iloc[temp_peak_idx:],
-                    mode='lines+markers',
-                    name='Cooling Phase',
-                    line=dict(color='blue', width=2),
-                    marker=dict(size=4)
-                ))
-                
-                # Mark peak
-                fig.add_trace(go.Scatter(
-                    x=[peak_time],
-                    y=[peak_temp],
-                    mode='markers',
-                    name=f'Peak: {peak_temp:.1f}°C',
-                    marker=dict(color='green', size=12, symbol='star')
-                ))
-                
-                fig.update_layout(
-                    title="Temperature Profile (Heating & Cooling)",
-                    xaxis_title="Time (hours)",
-                    yaxis_title="Temperature (°C)",
-                    hovermode='x unified',
-                    height=400
+            st.markdown("### 📈 Raw Data Plot")
+            
+            # Identify heating and cooling phases
+            temp_peak_idx = df['temperature_°C'].idxmax()
+            peak_time = df.loc[temp_peak_idx, 'time_h']
+            peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
+            
+            fig = go.Figure()
+            
+            # Heating phase
+            fig.add_trace(go.Scatter(
+                x=df['time_h'].iloc[:temp_peak_idx+1],
+                y=df['temperature_°C'].iloc[:temp_peak_idx+1],
+                mode='lines+markers',
+                name='Heating Phase',
+                line=dict(color='red', width=2),
+                marker=dict(size=4)
+            ))
+            
+            # Cooling phase
+            fig.add_trace(go.Scatter(
+                x=df['time_h'].iloc[temp_peak_idx:],
+                y=df['temperature_°C'].iloc[temp_peak_idx:],
+                mode='lines+markers',
+                name='Cooling Phase',
+                line=dict(color='blue', width=2),
+                marker=dict(size=4)
+            ))
+            
+            # Mark peak
+            fig.add_trace(go.Scatter(
+                x=[peak_time],
+                y=[peak_temp],
+                mode='markers',
+                name=f'Peak: {peak_temp:.1f}°C',
+                marker=dict(color='green', size=12, symbol='star')
+            ))
+            
+            fig.update_layout(
+                title=dict(
+                    text="Temperature Profile",
+                    font=dict(size=14)
+                ),
+                xaxis_title="Time (hours)",
+                yaxis_title="Temperature (°C)",
+                hovermode='x unified',
+                height=400,
+                margin=dict(l=40, r=40, t=50, b=40),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5
                 )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Store peak information
-                st.session_state['peak_idx'] = temp_peak_idx
-                st.session_state['peak_time'] = peak_time
-                st.session_state['peak_temp'] = peak_temp
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Store peak information
+            st.session_state['peak_idx'] = temp_peak_idx
+            st.session_state['peak_time'] = peak_time
+            st.session_state['peak_temp'] = peak_temp
     
     # ========================================================================
     # Tab 2: PCE Parameters
