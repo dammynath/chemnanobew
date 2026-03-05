@@ -3592,11 +3592,220 @@ def display_ai_assistant():
         with col3:
             st.metric("Responses", assistant_msgs)
 
+import streamlit as st
+import traceback
+import pickle
+import os
+from datetime import datetime
+import threading
+import time
+import requests
+from functools import wraps
+
+class CompleteSelfHealingSystem:
+    """Complete self-healing system for Streamlit apps"""
+    
+    def __init__(self, app_name="CHEMNANOBEW", slack_webhook=None):
+        self.app_name = app_name
+        self.slack_webhook = slack_webhook
+        self.crash_count = 0
+        self.setup_recovery_system()
+    
+    def setup_recovery_system(self):
+        """Initialize all healing mechanisms"""
+        self.setup_auto_backup()
+        self.setup_crash_detection()
+        self.setup_health_checks()
+    
+    def setup_auto_backup(self):
+        """Auto-backup session state every minute"""
+        def backup_loop():
+            while True:
+                time.sleep(60)
+                self.backup_session()
+        
+        thread = threading.Thread(target=backup_loop, daemon=True)
+        thread.start()
+    
+    def backup_session(self):
+        """Backup session state to file"""
+        try:
+            backup = {
+                'timestamp': datetime.now().isoformat(),
+                'session': dict(st.session_state),
+                'crash_count': self.crash_count
+            }
+            with open('app_backup.pkl', 'wb') as f:
+                pickle.dump(backup, f)
+        except:
+            pass
+    
+    def setup_crash_detection(self):
+        """Monitor for crashes and attempt recovery"""
+        if os.path.exists('crash_flag.txt'):
+            with open('crash_flag.txt', 'r') as f:
+                last_crash = f.read()
+            st.warning(f"🔄 App recovered from crash at {last_crash}")
+            os.remove('crash_flag.txt')
+    
+    def setup_health_checks(self):
+        """Monitor memory usage and other health metrics"""
+        import psutil
+        process = psutil.Process()
+        memory_usage = process.memory_percent()
+        
+        if memory_usage > 80:  # If memory > 80%
+            st.warning(f"⚠️ High memory usage: {memory_usage:.1f}%")
+            self.cleanup_memory()
+    
+    def cleanup_memory(self):
+        """Attempt to free memory"""
+        import gc
+        gc.collect()
+        
+        # Clear caches if needed
+        if hasattr(st, 'cache_data'):
+            st.cache_data.clear()
+    
+    def healing_decorator(self, func):
+        """Decorator that adds self-healing to any function"""
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                return self.heal_from_error(func, e, *args, **kwargs)
+        return wrapper
+    
+    def heal_from_error(self, func, error, *args, **kwargs):
+        """Attempt to heal from an error"""
+        
+        # Log the crash
+        self.crash_count += 1
+        crash_data = {
+            'timestamp': datetime.now().isoformat(),
+            'function': func.__name__,
+            'error': str(error),
+            'traceback': traceback.format_exc(),
+            'crash_count': self.crash_count
+        }
+        
+        # Save crash flag
+        with open('crash_flag.txt', 'w') as f:
+            f.write(crash_data['timestamp'])
+        
+        # Log to file
+        with open('crash_log.txt', 'a') as f:
+            f.write(f"\n{'='*50}\n")
+            f.write(f"CRASH #{self.crash_count} at {crash_data['timestamp']}\n")
+            f.write(f"Function: {crash_data['function']}\n")
+            f.write(f"Error: {crash_data['error']}\n")
+            f.write(crash_data['traceback'])
+        
+        # Send alert
+        self.send_alert(crash_data)
+        
+        # Attempt recovery strategies in order
+        recovery_methods = [
+            self.recovery_clear_cache,
+            self.recovery_reset_state,
+            self.recovery_fallback_data
+        ]
+        
+        for method in recovery_methods:
+            result = method(func, error, *args, **kwargs)
+            if result is not None:
+                return result
+        
+        # If all recovery fails, show graceful error
+        st.error("🆘 Critical error - please refresh the page")
+        return None
+    
+    def send_alert(self, crash_data):
+        """Send alert via Slack/email"""
+        if self.slack_webhook:
+            try:
+                message = {
+                    "text": f"🚨 *{self.app_name} Crash Alert*\n"
+                            f"Count: #{crash_data['crash_count']}\n"
+                            f"Time: {crash_data['timestamp']}\n"
+                            f"Function: `{crash_data['function']}`\n"
+                            f"Error: `{crash_data['error']}`"
+                }
+                requests.post(self.slack_webhook, json=message)
+            except:
+                pass
+    
+    def recovery_clear_cache(self, func, error, *args, **kwargs):
+        """Strategy 1: Clear caches and retry"""
+        try:
+            import gc
+            gc.collect()
+            if hasattr(st, 'cache_data'):
+                st.cache_data.clear()
+            return func(*args, **kwargs)
+        except:
+            return None
+    
+    def recovery_reset_state(self, func, error, *args, **kwargs):
+        """Strategy 2: Reset session state and retry"""
+        try:
+            # Save critical data
+            critical_keys = ['api_status', 'pce_data']
+            saved = {k: st.session_state.get(k) for k in critical_keys}
+            
+            # Clear session
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            
+            # Restore critical data
+            for k, v in saved.items():
+                if v is not None:
+                    st.session_state[k] = v
+            
+            return func(*args, **kwargs)
+        except:
+            return None
+    
+    def recovery_fallback_data(self, func, error, *args, **kwargs):
+        """Strategy 3: Use fallback data"""
+        try:
+            # Load last known good state
+            if os.path.exists('app_backup.pkl'):
+                with open('app_backup.pkl', 'rb') as f:
+                    backup = pickle.load(f)
+                    # Restore backup
+                    for k, v in backup.get('session', {}).items():
+                        if k not in st.session_state:
+                            st.session_state[k] = v
+            return None
+        except:
+            return None
+
+# Initialize the healing system
+healer = CompleteSelfHealingSystem(
+    app_name="CHEMNANOBEW",
+    slack_webhook="YOUR_SLACK_WEBHOOK"  # Optional
+)
+
+# Apply to your functions with decorator
+@healer.healing_decorator
+def display_quantum_dots_tab(uploaded_file):
+    # Your existing code
+    pass
+
+@healer.healing_decorator
+def display_porphyrins_tab(uploaded_file):
+    # Your existing code
+    pass
+
+
 
 # ============================================================================
 # Main function - COMPLETELY FIXED
 # ============================================================================
 def main():
+    try:
     # Check if we have the required display functions
     # This is a safety check to avoid crashes
     required_functions = [
@@ -3686,26 +3895,27 @@ def main():
     with col2:
         st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
         st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
+            pass
 
     # Route to appropriate tab based on selection
     try:
         # Strip emoji for function routing (or keep as is)
         if mode == "🧪 Quantum Dots":
-            display_quantum_dots_tab(uploaded_file)
+            healer.healing_decorator(display_quantum_dots_tab)(uploaded_file)
             
         elif mode == "🔬 Porphyrins":
-            display_porphyrins_tab(uploaded_file)
+            healer.healing_decorator(display_porphyrins_tab)(uploaded_file)
             
         elif mode == "🎯 Multi-Objective":
-            display_multi_objective_tab()
+            healer.healing_decorator(display_multi_objective_tab)()
             
         elif mode == "🧬 Molecular Generator":
-            display_molecular_generator_tab()
+            healer.healing_decorator(display_molecular_generator_tab)()
             
         elif mode == "📊 Advanced Visualization":
-            display_advanced_visualization(uploaded_file)
+            healer.healing_decorator(display_advanced_visualization)(uploaded_file)
         elif mode == "🔥 PCE Analyzer":
-            display_pce_tab()
+            healer.healing_decorator(display_pce_tab)()
         
         elif mode == "🤖 AI Research Assistant":
             # Initialize and render the web-search AI assistant
@@ -3715,7 +3925,7 @@ def main():
             
         elif mode == "💬 ChemNanoBot":
             # Render the rule-based synthesis expert
-            display_ai_assistant()
+            healer.healing_decorator(display_ai_assistant)()
             
         else:
             st.error(f"Unknown mode selected: {mode}")
@@ -3752,3 +3962,5 @@ if __name__ == "__main__":
         3. Check the console/terminal for detailed error messages
         4. Try refreshing the page
         """)
+        healer.heal_from_error(main, e)
+
