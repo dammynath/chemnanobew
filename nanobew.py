@@ -1857,7 +1857,7 @@ def display_pce_tab():
         
         data_source = st.radio(
             "Select data source:",
-            ["Use Sample Data (PCE=26%)", "Upload Custom CSV"],
+            ["Use Sample Data for (PCE%)", "Upload Custom CSV"],
             key="pce_data_source"
         )
         
@@ -2097,7 +2097,7 @@ def display_pce_tab():
 97,20"""
             
             df = pd.read_csv(io.StringIO(sample_data))
-            st.info("📊 Using sample data with expected PCE = 26%")
+            st.info("📊 Using sample data")
             st.session_state['pce_data'] = df
                
             
