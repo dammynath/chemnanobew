@@ -1892,14 +1892,14 @@ def display_pce_tab():
                     
                     # Ensure correct column names
                     if len(df.columns) >= 2:
-                        df.columns = ['time_h', 'temperature_°C'] + list(df.columns[2:])
+                        df.columns = ['time_min', 'temperature_°C'] + list(df.columns[2:])
                     
                     st.session_state['pce_data'] = df
             else:
                 df = st.session_state.get('pce_data', None)
         else:
             # Use sample data with proper encoding
-            sample_data = """time_h,temperature_°C
+            sample_data = """time_min,temperature_°C
 0,20
 0.5,21.8
 1,23.3
@@ -2124,14 +2124,14 @@ def display_pce_tab():
             
             # Identify heating and cooling phases
             temp_peak_idx = df['temperature_°C'].idxmax()
-            peak_time = df.loc[temp_peak_idx, 'time_h']
+            peak_time = df.loc[temp_peak_idx, 'time_min']
             peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
             
             fig = go.Figure()
             
             # Heating phase
             fig.add_trace(go.Scatter(
-                x=df['time_h'].iloc[:temp_peak_idx+1],
+                x=df['time_min'].iloc[:temp_peak_idx+1],
                 y=df['temperature_°C'].iloc[:temp_peak_idx+1],
                 mode='lines+markers',
                 name='Heating Phase',
@@ -2141,7 +2141,7 @@ def display_pce_tab():
             
             # Cooling phase
             fig.add_trace(go.Scatter(
-                x=df['time_h'].iloc[temp_peak_idx:],
+                x=df['time_min'].iloc[temp_peak_idx:],
                 y=df['temperature_°C'].iloc[temp_peak_idx:],
                 mode='lines+markers',
                 name='Cooling Phase',
@@ -2163,7 +2163,7 @@ def display_pce_tab():
                     text="Temperature Profile",
                     font=dict(size=14)
                 ),
-                xaxis_title="Time (hours)",
+                xaxis_title="Time (mins)",
                 yaxis_title="Temperature (°C)",
                 hovermode='x unified',
                 height=400,
@@ -2348,7 +2348,7 @@ def display_pce_tab():
                 
                 # Calculate time constant from cooling curve
                 cooling_data = df.iloc[peak_idx:].copy()
-                cooling_data['time_from_peak'] = cooling_data['time_h'] - peak_time
+                cooling_data['time_from_peak'] = cooling_data['time_min'] - peak_time
                 cooling_data['theta'] = (cooling_data['temperature_°C'] - params['ambient_temp']) / (peak_temp - params['ambient_temp'])
                 
                 # Remove any points where theta <= 0
@@ -2366,7 +2366,7 @@ def display_pce_tab():
                         p0=[1.0]
                     )
                     tau = popt[0]
-                    tau_seconds = tau * 3600  # Convert hours to seconds
+                    tau_seconds = tau * 60  # Convert mins to seconds
                     
                     # Calculate R²
                     residuals = cooling_data['theta'] - exp_decay(cooling_data['time_from_peak'], tau)
@@ -2374,7 +2374,7 @@ def display_pce_tab():
                     ss_tot = np.sum((cooling_data['theta'] - cooling_data['theta'].mean())**2)
                     r_squared = 1 - (ss_res / ss_tot)
                     
-                    st.success(f"✅ Time Constant (τ): {tau:.2f} hours ({tau_seconds:.0f} seconds)")
+                    st.success(f"✅ Time Constant (τ): {tau:.2f} mins ({tau_seconds:.0f} seconds)")
                     st.metric("R² Value", f"{r_squared:.4f}")
                     
                     # Calculate hA
@@ -2386,7 +2386,7 @@ def display_pce_tab():
                     
                     # Store for results tab
                     st.session_state['pce_results'] = {
-                        'tau_hours': tau,
+                        'tau_mins': tau,
                         'tau_seconds': tau_seconds,
                         'r_squared': r_squared,
                         'hA': hA,
@@ -2430,7 +2430,7 @@ def display_pce_tab():
                         row=1, col=1
                     )
                     
-                    fig.update_xaxes(title_text="Time from Peak (hours)", row=1, col=1)
+                    fig.update_xaxes(title_text="Time from Peak (mins)", row=1, col=1)
                     fig.update_yaxes(title_text="θ = (T - Tₐ)/(Tₘₐₓ - Tₐ)", row=1, col=1)
                     
                     # ln(θ) vs time plot (should be linear for first-order cooling)
@@ -2469,7 +2469,7 @@ def display_pce_tab():
                         row=1, col=2
                     )
                     
-                    fig.update_xaxes(title_text="Time from Peak (hours)", row=1, col=2)
+                    fig.update_xaxes(title_text="Time from Peak (mins)", row=1, col=2)
                     fig.update_yaxes(title_text="ln(θ)", row=1, col=2)
                     
                     fig.update_layout(height=500, showlegend=True)
@@ -2514,7 +2514,7 @@ def display_pce_tab():
             
             if params:
                 cooling_analysis = df.iloc[cooling_start:cooling_end+1].copy()
-                cooling_analysis['time_from_peak'] = cooling_analysis['time_h'] - df.loc[peak_idx, 'time_h']
+                cooling_analysis['time_from_peak'] = cooling_analysis['time_min'] - df.loc[peak_idx, 'time_min']
                 cooling_analysis['theta'] = (cooling_analysis['temperature_°C'] - params['ambient_temp']) / (df.loc[peak_idx, 'temperature_°C'] - params['ambient_temp'])
                 cooling_analysis = cooling_analysis[cooling_analysis['theta'] > 0].copy()
                 cooling_analysis['ln_theta'] = np.log(cooling_analysis['theta'])
@@ -2601,7 +2601,7 @@ def display_pce_tab():
                             
                             fig.update_layout(
                                 title="Cooling Curve Model Comparison",
-                                xaxis_title="Time from Peak (hours)",
+                                xaxis_title="Time from Peak (mins)",
                                 yaxis_title="θ",
                                 height=500
                             )
@@ -2619,7 +2619,7 @@ def display_pce_tab():
                     st.markdown("#### 📊 Linear Regression Analysis")
                     st.write(f"**Equation:** ln(θ) = {slope:.4f}t + {intercept:.4f}")
                     st.write(f"**R²:** {r_value**2:.4f}")
-                    st.write(f"**Time constant from slope:** τ = {-1/slope:.3f} hours")
+                    st.write(f"**Time constant from slope:** τ = {-1/slope:.3f} mins")
                     
                 except Exception as e:
                     st.error(f"Error in model fitting: {str(e)}")
@@ -2655,7 +2655,7 @@ def display_pce_tab():
             
             with col2:
                 st.markdown("#### 📈 Thermal Parameters")
-                st.write(f"**Time Constant (τ):** {results['tau_hours']:.3f} hours")
+                st.write(f"**Time Constant (τ):** {results['tau_mins']:.3f} mins")
                 st.write(f"**Time Constant (τ):** {results['tau_seconds']:.0f} seconds")
                 st.write(f"**hA Value:** {results['hA']:.4f} W/K")
                 st.write(f"**ΔT Net:** {results['delta_T_net']:.2f}°C")
@@ -2711,7 +2711,7 @@ def display_pce_tab():
                 if isinstance(value, (int, float)):
                     export_data['Parameter'].append(key.replace('_', ' ').title())
                     export_data['Value'].append(value)
-                    unit = 'hours' if 'tau' in key else ('W/K' if 'hA' in key else ('%' if 'pce' in key else ''))
+                    unit = 'mins' if 'tau' in key else ('W/K' if 'hA' in key else ('%' if 'pce' in key else ''))
                     export_data['Unit'].append(unit)
             
             export_df = pd.DataFrame(export_data)
