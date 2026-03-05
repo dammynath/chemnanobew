@@ -3808,14 +3808,14 @@ def main():
     try:
     # Check if we have the required display functions
     # This is a safety check to avoid crashes
-    required_functions = [
-        'display_quantum_dots_tab',
-        'display_porphyrins_tab', 
-        'display_multi_objective_tab',
-        'display_molecular_generator_tab',
-        'display_advanced_visualization',
-        'display_ai_assistant'
-    ]
+        required_functions = [
+            'display_quantum_dots_tab',
+            'display_porphyrins_tab', 
+            'display_multi_objective_tab',
+            'display_molecular_generator_tab',
+            'display_advanced_visualization',
+            'display_ai_assistant'
+        ]
     
     # Verify all required functions exist
     for func_name in required_functions:
