@@ -3930,7 +3930,7 @@ def main():
         else:
             st.error(f"Unknown mode selected: {mode}")
             
-    except Exception as e:
+except Exception as e:
         st.error(f"⚠️ An error occurred while loading the {mode} tab:")
         st.exception(e)
         st.info("Please check the console logs for more details or refresh the page.")
