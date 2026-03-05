@@ -53,6 +53,20 @@ def calculate_composite_score(df, weights):
         if prop in df.columns:
             score += weight * normalize_series(df[prop])
     return score
+
+# Initialize self-healing system (optional)
+try:
+    from self_healing import CompleteSelfHealingSystem
+    healer = CompleteSelfHealingSystem(app_name="CHEMNANOBEW")
+except ImportError:
+    # Create a dummy healer if module not available
+    class DummyHealer:
+        def healing_decorator(self, func):
+            return func
+        def heal_from_error(self, func, error):
+            pass
+    healer = DummyHealer()
+    print("Self-healing system not available - using dummy")
 # ============================================================================
 # Page config (must be first)
 # ============================================================================
@@ -3802,12 +3816,12 @@ def display_porphyrins_tab(uploaded_file):
 
 
 # ============================================================================
-# Main function - COMPLETELY FIXED
+# Main function - COMPLETELY FIXED with proper indentation
 # ============================================================================
 def main():
     try:
-    # Check if we have the required display functions
-    # This is a safety check to avoid crashes
+        # Check if we have the required display functions
+        # This is a safety check to avoid crashes
         required_functions = [
             'display_quantum_dots_tab',
             'display_porphyrins_tab', 
@@ -3816,106 +3830,122 @@ def main():
             'display_advanced_visualization',
             'display_ai_assistant'
         ]
-    
-    # Verify all required functions exist
-    for func_name in required_functions:
-        if func_name not in globals():
-            st.error(f"❌ Critical error: Function '{func_name}' is not defined. Please check your code.")
-            st.stop()
-    
-    with st.sidebar:
-        # Display logo
-        if os.path.exists("images") and os.listdir("images"):
-            st.image(os.path.join("images", os.listdir("images")[0]), use_column_width=True)
-        else:
-            st.markdown("""
-            <div class='sidebar-logo'>
-                <div style='font-size:3rem;'>🧪</div>
-                <div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div>
-                <div style='color:#ecf0f1; font-size:0.9rem;'>LABORATORY</div>
-            </div>
-            """, unsafe_allow_html=True)
         
-        st.markdown("---")
+        # Verify all required functions exist
+        for func_name in required_functions:
+            if func_name not in globals():
+                st.error(f"❌ Critical error: Function '{func_name}' is not defined. Please check your code.")
+                st.stop()
         
-        # CLEAN MODE SELECTION - No duplicates, clear labels
-        mode = st.radio("Select Mode", [
-    "🧪 Quantum Dots",
-    "🔬 Porphyrins", 
-    "🎯 Multi-Objective",
-    "🧬 Molecular Generator",
-    "📊 Advanced Visualization",
-    "🔥 PCE Analyzer",  # Add this line
-    "🤖 AI Research Assistant",
-    "💬 ChemNanoBot"
-])
-        
-        st.markdown("---")
-        
-        # Logo upload section
-        with st.expander("📸 Upload Logo"):
-            logo = st.file_uploader("Choose image", type=['png','jpg','jpeg','gif'], key="logo_uploader")
-            if logo is not None:
-                saved_path = save_uploaded_image(logo)
-                if saved_path:
-                    st.success("✅ Logo uploaded! Refresh to see changes.")
-                    st.rerun()
-        
-        st.markdown("---")
-        
-        # Data upload section
-        st.markdown("## 📁 Data Management")
-        uploaded_file = st.file_uploader("Upload CSV data", type=['csv'], key="data_uploader")
-        
-        if uploaded_file is not None:
-            st.success(f"✅ Loaded: {uploaded_file.name}")
-        
-        st.markdown("---")
-        
-        # About section
-        st.markdown("## ℹ️ About")
-        st.info(
-            "**CHEM‑NANO‑BEW Laboratory**\n\n"
-            "Advanced synthesis optimization for "
-            "quantum dots and porphyrins using "
-            "machine learning and DoE.\n\n"
-            f"**Version:** 2.1 (RDKit Mode)"
-        )
-        
-        # API Status (if AI assistant is selected)
-        if 'api_status' in st.session_state:
-            with st.expander("🔌 API Status"):
-                status = st.session_state.api_status
-                st.write(f"Brave: {'✅' if status.get('brave') else '❌'}")
-                st.write(f"Tavily: {'✅' if status.get('tavily') else '❌'}")
-                st.write(f"OpenAI: {'✅' if status.get('openai') else '❌'}")
+        with st.sidebar:
+            # Display logo
+            if os.path.exists("images") and os.listdir("images"):
+                st.image(os.path.join("images", os.listdir("images")[0]), use_column_width=True)
+            else:
+                st.markdown("""
+                <div class='sidebar-logo'>
+                    <div style='font-size:3rem;'>🧪</div>
+                    <div class='sidebar-logo-text'>CHEM‑NANO‑BEW</div>
+                    <div style='color:#ecf0f1; font-size:0.9rem;'>LABORATORY</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # CLEAN MODE SELECTION - No duplicates, clear labels
+            mode = st.radio("Select Mode", [
+                "🧪 Quantum Dots",
+                "🔬 Porphyrins", 
+                "🎯 Multi-Objective",
+                "🧬 Molecular Generator",
+                "📊 Advanced Visualization",
+                "🔥 PCE Analyzer",
+                "🤖 AI Research Assistant",
+                "💬 ChemNanoBot"
+            ])
+            
+            st.markdown("---")
+            
+            # Logo upload section
+            with st.expander("📸 Upload Logo"):
+                logo = st.file_uploader("Choose image", type=['png','jpg','jpeg','gif'], key="logo_uploader")
+                if logo is not None:
+                    saved_path = save_uploaded_image(logo)
+                    if saved_path:
+                        st.success("✅ Logo uploaded! Refresh to see changes.")
+                        st.rerun()
+            
+            st.markdown("---")
+            
+            # Data upload section
+            st.markdown("## 📁 Data Management")
+            uploaded_file = st.file_uploader("Upload CSV data", type=['csv'], key="data_uploader")
+            
+            if uploaded_file is not None:
+                st.success(f"✅ Loaded: {uploaded_file.name}")
+            
+            st.markdown("---")
+            
+            # About section
+            st.markdown("## ℹ️ About")
+            st.info(
+                "**CHEM‑NANO‑BEW Laboratory**\n\n"
+                "Advanced synthesis optimization for "
+                "quantum dots and porphyrins using "
+                "machine learning and DoE.\n\n"
+                f"**Version:** 2.1 (RDKit Mode)"
+            )
+            
+            # API Status (if AI assistant is selected)
+            if 'api_status' in st.session_state:
+                with st.expander("🔌 API Status"):
+                    status = st.session_state.api_status
+                    st.write(f"Brave: {'✅' if status.get('brave') else '❌'}")
+                    st.write(f"Tavily: {'✅' if status.get('tavily') else '❌'}")
+                    st.write(f"OpenAI: {'✅' if status.get('openai') else '❌'}")
 
-    # Main content area - Header
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
-        st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
-            pass
+        # Main content area - Header
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
+            st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
 
-    # Route to appropriate tab based on selection
-    try:
-        # Strip emoji for function routing (or keep as is)
+        # Route to appropriate tab based on selection
         if mode == "🧪 Quantum Dots":
-            healer.healing_decorator(display_quantum_dots_tab)(uploaded_file)
+            if 'healer' in globals():
+                healer.healing_decorator(display_quantum_dots_tab)(uploaded_file)
+            else:
+                display_quantum_dots_tab(uploaded_file)
             
         elif mode == "🔬 Porphyrins":
-            healer.healing_decorator(display_porphyrins_tab)(uploaded_file)
+            if 'healer' in globals():
+                healer.healing_decorator(display_porphyrins_tab)(uploaded_file)
+            else:
+                display_porphyrins_tab(uploaded_file)
             
         elif mode == "🎯 Multi-Objective":
-            healer.healing_decorator(display_multi_objective_tab)()
+            if 'healer' in globals():
+                healer.healing_decorator(display_multi_objective_tab)()
+            else:
+                display_multi_objective_tab()
             
         elif mode == "🧬 Molecular Generator":
-            healer.healing_decorator(display_molecular_generator_tab)()
+            if 'healer' in globals():
+                healer.healing_decorator(display_molecular_generator_tab)()
+            else:
+                display_molecular_generator_tab()
             
         elif mode == "📊 Advanced Visualization":
-            healer.healing_decorator(display_advanced_visualization)(uploaded_file)
+            if 'healer' in globals():
+                healer.healing_decorator(display_advanced_visualization)(uploaded_file)
+            else:
+                display_advanced_visualization(uploaded_file)
+                
         elif mode == "🔥 PCE Analyzer":
-            healer.healing_decorator(display_pce_tab)()
+            if 'healer' in globals():
+                healer.healing_decorator(display_pce_tab)()
+            else:
+                display_pce_tab()
         
         elif mode == "🤖 AI Research Assistant":
             # Initialize and render the web-search AI assistant
@@ -3924,16 +3954,23 @@ def main():
             st.session_state.ai_research_assistant.render_ui()
             
         elif mode == "💬 ChemNanoBot":
-            # Render the rule-based synthesis expert
-            healer.healing_decorator(display_ai_assistant)()
+            if 'healer' in globals():
+                healer.healing_decorator(display_ai_assistant)()
+            else:
+                display_ai_assistant()
             
         else:
             st.error(f"Unknown mode selected: {mode}")
             
-except Exception as e:
-        st.error(f"⚠️ An error occurred while loading the {mode} tab:")
+    except Exception as e:
+        st.error(f"⚠️ An error occurred while loading the {mode if 'mode' in locals() else 'unknown'} tab:")
         st.exception(e)
         st.info("Please check the console logs for more details or refresh the page.")
+        
+        # Attempt healing if available
+        if 'healer' in globals():
+            st.info("🔄 Attempting self-healing...")
+            healer.heal_from_error(main, e)
 
     # Footer
     st.markdown("---")
@@ -3953,6 +3990,9 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
+        # Create a fallback Streamlit app for critical errors
+        import streamlit as st
+        st.set_page_config(page_title="CHEMNANOBEW - Error", page_icon="🚨")
         st.error("🚨 **Critical Application Error**")
         st.exception(e)
         st.markdown("""
@@ -3961,6 +4001,10 @@ if __name__ == "__main__":
         2. Verify your API keys in `.streamlit/secrets.toml`
         3. Check the console/terminal for detailed error messages
         4. Try refreshing the page
+        5. If the error persists, check the logs for more details
         """)
-        healer.heal_from_error(main, e)
-
+        
+        # Attempt healing if available
+        if 'healer' in globals():
+            st.info("🔄 Attempting self-healing...")
+            healer.heal_from_error(main, e)
