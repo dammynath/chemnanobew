@@ -54,19 +54,8 @@ def calculate_composite_score(df, weights):
             score += weight * normalize_series(df[prop])
     return score
 
-# Initialize self-healing system (optional)
-try:
-    from self_healing import CompleteSelfHealingSystem
-    healer = CompleteSelfHealingSystem(app_name="CHEMNANOBEW")
-except ImportError:
-    # Create a dummy healer if module not available
-    class DummyHealer:
-        def healing_decorator(self, func):
-            return func
-        def heal_from_error(self, func, error):
-            pass
-    healer = DummyHealer()
-    print("Self-healing system not available - using dummy")
+
+    
 # ============================================================================
 # Page config (must be first)
 # ============================================================================
