@@ -26,9 +26,8 @@ openai>=1.0.0
 duckduckgo-search>=6.0.0
 wikipedia>=1.4.0
 requests>=2.31.0
-from scipy.optimize import curve_fit
-from scipy import stats
 import io
+
 
 
 
