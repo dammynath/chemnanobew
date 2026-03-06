@@ -2558,7 +2558,7 @@ def display_pce_tab():
                 st.write(f"**Time Constant (τ):** {results['tau_seconds']:.0f} seconds")
                 st.write(f"**hA Value:** {results['hA']:.4f} W/K")
                 st.write(f"**ΔT Net:** {results['delta_T_net']:.2f}°C")
-                st.write(f"**R² Value:** {results['r2_biexp']:.4f}")
+                st.write(f"**R² Value:** {results['r_squared']:.4f}")
             
             st.markdown("---")
             
