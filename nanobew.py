@@ -1311,7 +1311,7 @@ def display_advanced_visualization(uploaded_file):
     with col2:
         chart_theme = st.selectbox(
             "Color Theme",
-            ["Plotly", "ggplot2", "seaborn", "simple_white", "presentation", "xgridoff"],
+            ["plotly", "ggplot2", "seaborn", "simple_white", "presentation", "xgridoff"],
             key="chart_theme"
         )
     
