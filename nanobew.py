@@ -1733,6 +1733,7 @@ def display_advanced_visualization(uploaded_file):
             # Show trend statistics
             st.markdown(f"**Trend Equation:** y = {model.coef_[0]:.4f} * x + {model.intercept_:.4f}")
             st.markdown(f"**R² Score:** {model.score(X, y):.4f}")
+
 # ============================================================================
 # TAB 6: PCE Analyzer - UPDATED with Adaptive R² (Maximizing Linear Points)
 # ============================================================================
@@ -1781,28 +1782,33 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     if len(unique_indices) < n_points:
         time_unique = time_values[unique_indices]
         ln_theta_unique = ln_theta_values[unique_indices]
-        n_points = len(time_unique)
+        n_points_unique = len(time_unique)
     else:
         time_unique = time_values
         ln_theta_unique = ln_theta_values
+        n_points_unique = n_points
+        unique_indices = list(range(n_points))
     
-    # Strategy 1: Start from the beginning (steepest part) and extend forward
+    # Initialize best_region with default values
     best_region = {
         'start_idx': 0,
         'end_idx': min_points - 1,
         'slope': 0,
         'intercept': 0,
         'r_squared': 0,
-        'n_points': min_points
+        'n_points': min_points,
+        'start_time': time_unique[0],
+        'end_time': time_unique[min_points - 1] if min_points - 1 < len(time_unique) else time_unique[-1],
+        'method': 'initial'
     }
     
-    # Try different starting points
-    for start_idx in range(0, min(n_points - min_points, 20)):  # Try first 20 starting points
+    # Strategy 1: Start from the beginning (steepest part) and extend forward
+    for start_idx in range(0, min(n_points_unique - min_points, 20)):  # Try first 20 starting points
         current_r2 = 1.0
         end_idx = start_idx + min_points - 1
         
         # Extend forward while R² stays above threshold
-        while end_idx < n_points - 1 and current_r2 >= r2_threshold:
+        while end_idx < n_points_unique - 1 and current_r2 >= r2_threshold:
             end_idx += 1
             x_window = time_unique[start_idx:end_idx+1]
             y_window = ln_theta_unique[start_idx:end_idx+1]
@@ -1829,10 +1835,7 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     
     # Strategy 2: If we couldn't find a long region, try backward from the end
     if best_region['n_points'] < min_points * 2:
-        for end_idx in range(n_points - 1, n_points - 21, -1):  # Try last 20 points
-            if end_idx < min_points - 1:
-                break
-            
+        for end_idx in range(n_points_unique - 1, max(n_points_unique - 21, min_points - 1), -1):  # Try last 20 points
             current_r2 = 1.0
             start_idx = end_idx - min_points + 1
             
@@ -1864,8 +1867,8 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     # Strategy 3: If still no good region, use highest R² region with at least min_points
     if best_region['n_points'] < min_points * 1.5:
         best_r2 = -1
-        for start_idx in range(0, n_points - min_points + 1, max(1, n_points // 10)):
-            for end_idx in range(start_idx + min_points, min(start_idx + n_points // 2, n_points)):
+        for start_idx in range(0, n_points_unique - min_points + 1, max(1, n_points_unique // 10)):
+            for end_idx in range(start_idx + min_points, min(start_idx + n_points_unique // 2, n_points_unique)):
                 x_window = time_unique[start_idx:end_idx+1]
                 y_window = ln_theta_unique[start_idx:end_idx+1]
                 
@@ -2013,50 +2016,6 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
         'r2_progression': r2_progression,
         'r2_drop_point': r2_drop_point
     }
-
-
-# Update the display_pce_tab function's Analysis tab to use the adaptive version
-# Replace the calculation call in Tab 3 with:
-
-# Calculate PCE using optimized adaptive method
-results = calculate_pce_optimized_adaptive(df, peak_idx, params)
-
-# Display region info with emphasis on number of points used
-opt = results['optimal_region']
-st.info(f"✅ Adaptive linear region found: {opt['n_points']} points from "
-        f"{opt['start_time']:.1f} to {opt['end_time']:.1f} minutes "
-        f"with R² = {opt['r_squared']:.4f} ({opt['method']})")
-
-# Add R² progression plot
-if results['point_counts'] and results['r2_progression']:
-    fig_r2 = go.Figure()
-    fig_r2.add_trace(go.Scatter(
-        x=results['point_counts'],
-        y=results['r2_progression'],
-        mode='lines+markers',
-        name='R² vs Points',
-        line=dict(color='purple', width=2)
-    ))
-    fig_r2.add_hline(
-        y=opt['r_squared'],
-        line_dash="dash",
-        line_color="red",
-        annotation_text=f"Selected: {opt['n_points']} pts"
-    )
-    if results['r2_drop_point']:
-        fig_r2.add_vline(
-            x=results['r2_drop_point'],
-            line_dash="dot",
-            line_color="orange",
-            annotation_text=f"Drop at {results['r2_drop_point']} pts"
-        )
-    fig_r2.update_layout(
-        title="R² vs Number of Points (Finding Optimal Length)",
-        xaxis_title="Number of Points",
-        yaxis_title="R² Value",
-        height=300
-    )
-    st.plotly_chart(fig_r2, use_container_width=True)
 
 
 def display_pce_tab():
@@ -2533,7 +2492,7 @@ def display_pce_tab():
             }
     
     # ========================================================================
-    # Tab 3: Analysis & Plots - UPDATED with Optimal R²
+    # Tab 3: Analysis & Plots - UPDATED with Adaptive R²
     # ========================================================================
     with pce_tabs[2]:
         if 'pce_data' not in st.session_state:
@@ -2548,10 +2507,10 @@ def display_pce_tab():
             elif peak_idx is None:
                 st.warning("⚠️ Peak temperature not identified. Please check data.")
             else:
-                st.markdown("### 📈 Photothermal Analysis with Optimal R²")
+                st.markdown("### 📈 Photothermal Analysis with Adaptive R²")
                 
-                # Calculate PCE using optimized method
-                results = calculate_pce_optimized(df, peak_idx, params)
+                # Calculate PCE using optimized adaptive method
+                results = calculate_pce_optimized_adaptive(df, peak_idx, params)
                 
                 # Display key metrics
                 col1, col2, col3, col4 = st.columns(4)
@@ -2562,12 +2521,13 @@ def display_pce_tab():
                 with col3:
                     st.metric("Time Constant τ", f"{results['tau_seconds']:.0f} s")
                 with col4:
-                    st.metric("Optimal R²", f"{results['r_squared']:.4f}")
+                    st.metric("R² Value", f"{results['r_squared']:.4f}")
                 
-                # Show optimal region info
+                # Display region info with emphasis on number of points used
                 opt = results['optimal_region']
-                st.info(f"✅ Optimal linear region found from {opt['start_time']:.1f} to {opt['end_time']:.1f} minutes "
-                       f"with R² = {opt['r_squared']:.4f} (slope = {opt['slope']:.4f})")
+                st.info(f"✅ Adaptive linear region found: {opt['n_points']} points from "
+                        f"{opt['start_time']:.1f} to {opt['end_time']:.1f} minutes "
+                        f"with R² = {opt['r_squared']:.4f} (method: {opt['method']})")
                 
                 # Plot 1: -ln(θ) vs time with optimal region highlighted
                 fig1 = go.Figure()
@@ -2590,7 +2550,7 @@ def display_pce_tab():
                     x=cooling_data.loc[mask, 'time_from_peak'],
                     y=cooling_data.loc[mask, 'neg_ln_theta'],
                     mode='markers',
-                    name='Optimal Linear Region',
+                    name=f'Optimal Region ({opt["n_points"]} pts)',
                     marker=dict(color='red', size=8)
                 ))
                 
@@ -2628,7 +2588,7 @@ def display_pce_tab():
                 
                 # Exponential fit
                 t_fit = np.linspace(0, cooling_data['time_from_peak'].max(), 100)
-                T_fit = params['ambient_temp'] + (st.session_state['peak_temp'] - params['ambient_temp']) * np.exp(-t_fit / results['tau_min'])
+                T_fit = params['ambient_temp'] + (peak_temp - params['ambient_temp']) * np.exp(-t_fit / results['tau_min'])
                 
                 fig2.add_trace(go.Scatter(
                     x=t_fit,
@@ -2646,25 +2606,32 @@ def display_pce_tab():
                 )
                 st.plotly_chart(fig2, use_container_width=True)
                 
-                # Plot 3: R² vs time window
-                if results['window_times']:
+                # Plot 3: R² progression
+                if results['point_counts'] and results['r2_progression']:
                     fig3 = go.Figure()
                     fig3.add_trace(go.Scatter(
-                        x=results['window_times'],
-                        y=results['r2_windows'],
+                        x=results['point_counts'],
+                        y=results['r2_progression'],
                         mode='lines+markers',
-                        name='R² by Window',
-                        line=dict(color='green', width=2)
+                        name='R² vs Points',
+                        line=dict(color='purple', width=2)
                     ))
                     fig3.add_hline(
-                        y=results['r_squared'],
+                        y=opt['r_squared'],
                         line_dash="dash",
                         line_color="red",
-                        annotation_text=f"Optimal R² = {results['r_squared']:.4f}"
+                        annotation_text=f"Selected: {opt['n_points']} pts"
                     )
+                    if results['r2_drop_point']:
+                        fig3.add_vline(
+                            x=results['r2_drop_point'],
+                            line_dash="dot",
+                            line_color="orange",
+                            annotation_text=f"Drop at {results['r2_drop_point']} pts"
+                        )
                     fig3.update_layout(
-                        title="R² Value vs Time Window (Finding Optimal Region)",
-                        xaxis_title="Time Window End (minutes)",
+                        title="R² vs Number of Points (Finding Optimal Length)",
+                        xaxis_title="Number of Points",
                         yaxis_title="R² Value",
                         height=300
                     )
@@ -2674,7 +2641,7 @@ def display_pce_tab():
                 st.session_state['pce_results'] = results
     
     # ========================================================================
-    # Tab 4: Cooling Curve Analysis - UPDATED with Optimal R²
+    # Tab 4: Cooling Curve Analysis
     # ========================================================================
     with pce_tabs[3]:
         if 'pce_data' not in st.session_state:
@@ -2715,66 +2682,72 @@ def display_pce_tab():
                     cooling_analysis['neg_ln_theta'] = -np.log(cooling_analysis['theta'])
                     
                     # Find optimal linear region for this selected range
-                    opt_region = find_optimal_linear_region(
-                        cooling_analysis['time_from_peak'].values,
-                        cooling_analysis['neg_ln_theta'].values
-                    )
-                    
-                    st.info(f"✅ Optimal linear region in selected range: {opt_region['start_time']:.1f} to {opt_region['end_time']:.1f} minutes "
-                           f"with R² = {opt_region['r_squared']:.4f}")
-                    
-                    # Plot with optimal region
-                    fig = go.Figure()
-                    
-                    # All data
-                    fig.add_trace(go.Scatter(
-                        x=cooling_analysis['time_from_peak'],
-                        y=cooling_analysis['neg_ln_theta'],
-                        mode='markers',
-                        name='All Data',
-                        marker=dict(color='lightblue', size=6)
-                    ))
-                    
-                    # Highlight optimal region
-                    mask = (cooling_analysis['time_from_peak'] >= opt_region['start_time']) & \
-                           (cooling_analysis['time_from_peak'] <= opt_region['end_time'])
-                    
-                    fig.add_trace(go.Scatter(
-                        x=cooling_analysis.loc[mask, 'time_from_peak'],
-                        y=cooling_analysis.loc[mask, 'neg_ln_theta'],
-                        mode='markers',
-                        name='Optimal Region',
-                        marker=dict(color='red', size=8)
-                    ))
-                    
-                    # Linear fit
-                    x_line = np.linspace(opt_region['start_time'], opt_region['end_time'], 100)
-                    y_line = opt_region['slope'] * x_line + opt_region['intercept']
-                    
-                    fig.add_trace(go.Scatter(
-                        x=x_line,
-                        y=y_line,
-                        mode='lines',
-                        name=f'Fit: y={opt_region["slope"]:.4f}x+{opt_region["intercept"]:.4f}',
-                        line=dict(color='red', width=2)
-                    ))
-                    
-                    fig.update_layout(
-                        title=f"-ln(θ) vs Time (Optimal R² = {opt_region['r_squared']:.4f})",
-                        xaxis_title="Time from Peak (minutes)",
-                        yaxis_title="-ln(θ)",
-                        height=500
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Display fit parameters
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Slope", f"{opt_region['slope']:.4f}")
-                    with col2:
-                        st.metric("Intercept", f"{opt_region['intercept']:.4f}")
-                    with col3:
-                        st.metric("Time Constant τ", f"{1/opt_region['slope']:.2f} mins")
+                    if len(cooling_analysis) > 5:
+                        opt_region = find_optimal_linear_region_adaptive(
+                            cooling_analysis['time_from_peak'].values,
+                            cooling_analysis['neg_ln_theta'].values,
+                            min_points=5,
+                            r2_threshold=0.98
+                        )
+                        
+                        st.info(f"✅ Optimal linear region in selected range: {opt_region['n_points']} points from "
+                               f"{opt_region['start_time']:.1f} to {opt_region['end_time']:.1f} minutes "
+                               f"with R² = {opt_region['r_squared']:.4f}")
+                        
+                        # Plot with optimal region
+                        fig = go.Figure()
+                        
+                        # All data
+                        fig.add_trace(go.Scatter(
+                            x=cooling_analysis['time_from_peak'],
+                            y=cooling_analysis['neg_ln_theta'],
+                            mode='markers',
+                            name='All Data',
+                            marker=dict(color='lightblue', size=6)
+                        ))
+                        
+                        # Highlight optimal region
+                        mask = (cooling_analysis['time_from_peak'] >= opt_region['start_time']) & \
+                               (cooling_analysis['time_from_peak'] <= opt_region['end_time'])
+                        
+                        fig.add_trace(go.Scatter(
+                            x=cooling_analysis.loc[mask, 'time_from_peak'],
+                            y=cooling_analysis.loc[mask, 'neg_ln_theta'],
+                            mode='markers',
+                            name='Optimal Region',
+                            marker=dict(color='red', size=8)
+                        ))
+                        
+                        # Linear fit
+                        x_line = np.linspace(opt_region['start_time'], opt_region['end_time'], 100)
+                        y_line = opt_region['slope'] * x_line + opt_region['intercept']
+                        
+                        fig.add_trace(go.Scatter(
+                            x=x_line,
+                            y=y_line,
+                            mode='lines',
+                            name=f'Fit: y={opt_region["slope"]:.4f}x+{opt_region["intercept"]:.4f}',
+                            line=dict(color='red', width=2)
+                        ))
+                        
+                        fig.update_layout(
+                            title=f"-ln(θ) vs Time (Optimal R² = {opt_region['r_squared']:.4f})",
+                            xaxis_title="Time from Peak (minutes)",
+                            yaxis_title="-ln(θ)",
+                            height=500
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Display fit parameters
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Slope", f"{opt_region['slope']:.4f}")
+                        with col2:
+                            st.metric("Intercept", f"{opt_region['intercept']:.4f}")
+                        with col3:
+                            st.metric("Time Constant τ", f"{1/opt_region['slope']:.2f} mins")
+                    else:
+                        st.warning("Not enough data points in selected range for analysis.")
     
     # ========================================================================
     # Tab 5: Results Summary
@@ -2810,10 +2783,11 @@ def display_pce_tab():
                 opt = results['optimal_region']
                 st.write(f"**Region Start:** {opt['start_time']:.2f} mins")
                 st.write(f"**Region End:** {opt['end_time']:.2f} mins")
+                st.write(f"**Number of Points:** {opt['n_points']}")
                 st.write(f"**Slope:** {opt['slope']:.4f}")
                 st.write(f"**Intercept:** {opt['intercept']:.4f}")
                 st.write(f"**R² Value:** {opt['r_squared']:.4f}")
-                st.write(f"**Points Used:** {opt['n_points']}")
+                st.write(f"**Method:** {opt['method']}")
                 
                 st.markdown("#### 📊 Thermal Parameters")
                 st.write(f"**Time Constant (τ):** {results['tau_min']:.3f} mins")
@@ -2833,6 +2807,7 @@ def display_pce_tab():
                 <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 1rem;'>
                     <h1 style='color: white; font-size: 4rem;'>{results['efficiency']:.1f}%</h1>
                     <p style='color: white; font-size: 1.2rem;'>Photothermal Conversion Efficiency</p>
+                    <p style='color: white; font-size: 1rem;'>{results['expected_range']}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -2877,6 +2852,10 @@ def display_pce_tab():
             export_data['Value'].append(opt['end_time'])
             export_data['Unit'].append('mins')
             
+            export_data['Parameter'].append('Optimal Region Points')
+            export_data['Value'].append(opt['n_points'])
+            export_data['Unit'].append('')
+            
             export_data['Parameter'].append('Linear Fit Slope')
             export_data['Value'].append(opt['slope'])
             export_data['Unit'].append('min⁻¹')
@@ -2912,6 +2891,7 @@ def display_pce_tab():
                 mime="text/csv",
                 use_container_width=True
             )
+
 # ============================================================================
 # TAB 7: AI Research Assistant Class
 # ============================================================================
