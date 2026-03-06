@@ -3115,7 +3115,7 @@ def display_ai_assistant():
         st.rerun()
         
 # ============================================================================
-# Main function
+# Main function - FIXED (removed healer references)
 # ============================================================================
 def main():
     try:
@@ -3136,8 +3136,9 @@ def main():
                 st.stop()
         
         with st.sidebar:
+            # Display logo
             if os.path.exists("images") and os.listdir("images"):
-                st.image(os.path.join("images", os.listdir("images")[0]), use_column_width=True)
+                st.image(os.path.join("images", os.listdir("images")[0]), use_container_width=True)
             else:
                 st.markdown("""
                 <div class='sidebar-logo'>
@@ -3149,6 +3150,7 @@ def main():
             
             st.markdown("---")
             
+            # Mode selection
             mode = st.radio("Select Mode", [
                 "🧪 Quantum Dots",
                 "🔬 Porphyrins", 
@@ -3162,6 +3164,7 @@ def main():
             
             st.markdown("---")
             
+            # Logo upload
             with st.expander("📸 Upload Logo"):
                 logo = st.file_uploader("Choose image", type=['png','jpg','jpeg','gif'], key="logo_uploader")
                 if logo is not None:
@@ -3171,6 +3174,8 @@ def main():
                         st.rerun()
             
             st.markdown("---")
+            
+            # Data upload
             st.markdown("## 📁 Data Management")
             uploaded_file = st.file_uploader("Upload CSV data", type=['csv'], key="data_uploader")
             
@@ -3178,6 +3183,8 @@ def main():
                 st.success(f"✅ Loaded: {uploaded_file.name}")
             
             st.markdown("---")
+            
+            # About section
             st.markdown("## ℹ️ About")
             st.info(
                 "**CHEM‑NANO‑BEW Laboratory**\n\n"
@@ -3187,6 +3194,7 @@ def main():
                 f"**Version:** 2.1 (RDKit Mode)"
             )
             
+            # API Status (if available)
             if 'api_status' in st.session_state:
                 with st.expander("🔌 API Status"):
                     status = st.session_state.api_status
@@ -3194,29 +3202,31 @@ def main():
                     st.write(f"Tavily: {'✅' if status.get('tavily') else '❌'}")
                     st.write(f"OpenAI: {'✅' if status.get('openai') else '❌'}")
 
+        # Main header
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown("<h1 class='main-header'>CHEM‑NANO‑BEW LABORATORY</h1>", unsafe_allow_html=True)
             st.markdown("<p class='lab-subtitle'>Advanced Synthesis Optimization Suite</p>", unsafe_allow_html=True)
 
+        # Route to appropriate tab - REMOVED healer references
         if mode == "🧪 Quantum Dots":
-            healer.healing_decorator(display_quantum_dots_tab)(uploaded_file)
+            display_quantum_dots_tab(uploaded_file)
         elif mode == "🔬 Porphyrins":
-            healer.healing_decorator(display_porphyrins_tab)(uploaded_file)
+            display_porphyrins_tab(uploaded_file)
         elif mode == "🎯 Multi-Objective":
-            healer.healing_decorator(display_multi_objective_tab)()
+            display_multi_objective_tab()
         elif mode == "🧬 Molecular Generator":
-            healer.healing_decorator(display_molecular_generator_tab)()
+            display_molecular_generator_tab()
         elif mode == "📊 Advanced Visualization":
-            healer.healing_decorator(display_advanced_visualization)(uploaded_file)
+            display_advanced_visualization(uploaded_file)
         elif mode == "🔥 PCE Analyzer":
-            healer.healing_decorator(display_pce_tab)()
+            display_pce_tab()
         elif mode == "🤖 AI Research Assistant":
             if 'ai_research_assistant' not in st.session_state:
                 st.session_state.ai_research_assistant = AIResearchAssistant()
             st.session_state.ai_research_assistant.render_ui()
         elif mode == "💬 ChemNanoBot":
-            healer.healing_decorator(display_ai_assistant)()
+            display_ai_assistant()
         else:
             st.error(f"Unknown mode selected: {mode}")
             
@@ -3224,10 +3234,8 @@ def main():
         st.error(f"⚠️ An error occurred:")
         st.exception(e)
         st.info("Please check the console logs or refresh the page.")
-        if 'healer' in globals():
-            st.info("🔄 Attempting self-healing...")
-            healer.heal_from_error(main, e)
 
+    # Footer
     st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -3243,16 +3251,14 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
+        # Fallback error display
         st.set_page_config(page_title="CHEMNANOBEW - Error", page_icon="🚨")
         st.error("🚨 **Critical Application Error**")
         st.exception(e)
         st.markdown("""
         ### Troubleshooting Steps:
-        1. Check that all required functions are defined
+        1. Check that all required functions are defined above
         2. Verify your API keys in `.streamlit/secrets.toml`
         3. Check the console for detailed error messages
         4. Try refreshing the page
         """)
-        if 'healer' in globals():
-            st.info("🔄 Attempting self-healing...")
-            healer.heal_from_error(main, e)
