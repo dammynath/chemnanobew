@@ -1735,9 +1735,6 @@ def display_advanced_visualization(uploaded_file):
             st.markdown(f"**R² Score:** {model.score(X, y):.4f}")
 
 # ============================================================================
-# TAB 6: PCE Analyzer
-# ============================================================================
-# ============================================================================
 # TAB 6: PCE Analyzer - UPDATED with Optimal R² Calculation
 # ============================================================================
 
@@ -1795,10 +1792,10 @@ def find_optimal_linear_region(time_values, ln_theta_values, min_points=5):
                 except:
                     continue
     
-    # If no good region found, use the first 30% of data
+    # If no good region found, use the first 60% of data
     if best_r2 < 0.8 and n_points > min_points * 2:
         # Fallback: use first 30% of points
-        end_idx = max(min_points, int(n_points * 0.3))
+        end_idx = max(min_points, int(n_points * 0.6))
         x_window = time_values[:end_idx]
         y_window = ln_theta_values[:end_idx]
         slope, intercept, r_value, _, _ = stats.linregress(x_window, y_window)
