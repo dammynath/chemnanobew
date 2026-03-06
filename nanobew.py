@@ -1738,7 +1738,7 @@ def display_advanced_visualization(uploaded_file):
 # TAB 6: PCE Analyzer - UPDATED with Optimal R² Calculation
 # ============================================================================
 
-def find_optimal_linear_region(time_values, ln_theta_values, min_points=5):
+def find_optimal_linear_region(time_values, ln_theta_values, min_points=20):
     """
     Find the optimal linear region in the -ln(theta) vs time plot that maximizes R².
     
