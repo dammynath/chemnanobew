@@ -2806,8 +2806,7 @@ def display_pce_tab():
                 st.markdown(f"""
                 <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 1rem;'>
                     <h1 style='color: white; font-size: 4rem;'>{results['efficiency']:.1f}%</h1>
-                    <p style='color: white; font-size: 1.2rem;'>Photothermal Conversion Efficiency</p>
-                    <p style='color: white; font-size: 1rem;'>{results['expected_range']}</p>
+                    <p style='color: white; font-size: 1.2rem;'>Photothermal Conversion Efficiency</p>                    
                 </div>
                 """, unsafe_allow_html=True)
             
