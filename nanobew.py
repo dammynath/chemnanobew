@@ -1738,7 +1738,7 @@ def display_advanced_visualization(uploaded_file):
 # TAB 6: PCE Analyzer - UPDATED with Adaptive R² (Maximizing Linear Points)
 # ============================================================================
 
-def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.98):
+def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.99):
     """
     Find the longest linear region in the -ln(theta) vs time plot that maintains high R².
     Adaptively extends the region while monitoring R² degradation.
@@ -1747,7 +1747,7 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     - time_values: array of time values (minutes)
     - ln_theta_values: array of -ln(theta) values
     - min_points: minimum number of points required for linear fit
-    - r2_threshold: minimum R² value to maintain (default 0.98)
+    - r2_threshold: minimum R² value to maintain (default 0.99)
     
     Returns:
     - Dictionary with optimal region parameters
@@ -1958,7 +1958,7 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
         cooling_data['time_from_peak'].values,
         cooling_data['neg_ln_theta'].values,
         min_points=5,
-        r2_threshold=0.98
+        r2_threshold=0.99
     )
     
     # Calculate tau from the optimal region slope
@@ -2687,7 +2687,7 @@ def display_pce_tab():
                             cooling_analysis['time_from_peak'].values,
                             cooling_analysis['neg_ln_theta'].values,
                             min_points=5,
-                            r2_threshold=0.98
+                            r2_threshold=0.99
                         )
                         
                         st.info(f"✅ Optimal linear region in selected range: {opt_region['n_points']} points from "
