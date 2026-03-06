@@ -517,12 +517,7 @@ def rl_suggest_experiment(history, ranges):
             suggestion[param] = np.random.uniform(low, high)
     return suggestion
 
-# ============================================================================
-# [ALL YOUR TAB FUNCTIONS GO HERE - display_quantum_dots_tab, 
-#  display_porphyrins_tab, display_multi_objective_tab, 
-#  display_molecular_generator_tab, display_advanced_visualization,
-#  display_pce_tab, AIResearchAssistant, ChemNanoBot, display_ai_assistant]
-# ============================================================================
+
 # ============================================================================
 # TAB 1: Quantum Dots
 # ============================================================================
@@ -1766,9 +1761,6 @@ def display_pce_tab():
     # ========================================================================
     # Tab 1: Data Input
     # ========================================================================
-        # ========================================================================
-# Tab 1: Data Input - FIXED ENCODING
-# ========================================================================
     with pce_tabs[0]:
         col1, col2 = st.columns([1, 1])
     
@@ -2123,11 +2115,11 @@ def display_pce_tab():
                 "Specific Heat Capacity (J/g·K)",
                 min_value=0.1,
                 max_value=10.0,
-                value=4.18,
+                value=4.184,
                 step=0.01,
-                format="%.2f",
+                format="%.3f",
                 key="pce_cp",
-                help="Default 4.18 J/g·K for water"
+                help="Default 4.184 J/g·K for water"
             )
             
             st.markdown("#### Laser Parameters")
@@ -2146,9 +2138,9 @@ def display_pce_tab():
                 "Laser Spot Area (cm²)",
                 min_value=0.01,
                 max_value=10.0,
-                value=0.5,
+                value=0.50265,
                 step=0.1,
-                format="%.2f",
+                format="%.3f",
                 key="pce_area"
             )
             
@@ -2251,11 +2243,11 @@ def display_pce_tab():
                 with col3:
                     st.metric("Peak Temperature", f"{peak_temp:.1f}°C")
                 with col4:
-                    st.metric("Time to Peak", f"{peak_time:.1f} h")
+                    st.metric("Time to Peak", f"{peak_time:.1f} mins")
                 
                 # Calculate time constant from cooling curve
                 cooling_data = df.iloc[peak_idx:].copy()
-                cooling_data['time_from_peak'] = cooling_data['time_h'] - peak_time
+                cooling_data['time_from_peak'] = cooling_data['time_mins'] - peak_time
                 cooling_data['theta'] = (cooling_data['temperature_°C'] - params['ambient_temp']) / (peak_temp - params['ambient_temp'])
                 
                 # Remove any points where theta <= 0
