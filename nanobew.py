@@ -2458,13 +2458,13 @@ def display_pce_tab():
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown("**Exponential Model**")
-                                st.write(f"τ = {tau_exp:.3f} h")
+                                st.write(f"τ = {tau_exp:.3f} mins")
                                 st.write(f"R² = {r2_exp:.4f}")
                             
                             with col2:
                                 st.markdown("**Bi-exponential Model**")
-                                st.write(f"a₁ = {popt_biexp[0]:.3f}, τ₁ = {popt_biexp[1]:.3f} h")
-                                st.write(f"a₂ = {popt_biexp[2]:.3f}, τ₂ = {popt_biexp[3]:.3f} h")
+                                st.write(f"a₁ = {popt_biexp[0]:.3f}, τ₁ = {popt_biexp[1]:.3f} mins")
+                                st.write(f"a₂ = {popt_biexp[2]:.3f}, τ₂ = {popt_biexp[3]:.3f} mins")
                                 st.write(f"R² = {r2_biexp:.4f}")
                             
                             # Plot both models
@@ -2558,7 +2558,7 @@ def display_pce_tab():
                 st.write(f"**Time Constant (τ):** {results['tau_seconds']:.0f} seconds")
                 st.write(f"**hA Value:** {results['hA']:.4f} W/K")
                 st.write(f"**ΔT Net:** {results['delta_T_net']:.2f}°C")
-                st.write(f"**R² Value:** {results['r_squared']:.4f}")
+                st.write(f"**R² Value:** {results['r2_biexp']:.4f}")
             
             st.markdown("---")
             
