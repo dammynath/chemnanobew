@@ -2182,7 +2182,7 @@ def display_pce_tab():
             )
             
             solvent_blank_delta = st.number_input(
-                "Solvent Blank ΔQ (°C)",
+                "Solvent Blank Δθ (°C)",
                 min_value=0.0,
                 max_value=20.0,
                 value=3.5,
