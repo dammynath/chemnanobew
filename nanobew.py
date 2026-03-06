@@ -1,5 +1,5 @@
 """
-chemnanobew_app.py – Synthesis Optimization Suite (RDKit‑Mode)
+nanobew_app.py – Synthesis Optimization Suite (RDKit‑Mode)
 Deploy on Streamlit Cloud with no RDKit dependency.
 """
 
