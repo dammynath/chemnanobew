@@ -1965,14 +1965,14 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
     tau_min = 1 / optimal_region['slope'] if optimal_region['slope'] > 0 else 200
     tau_seconds = tau_min * 60  # Convert to seconds
     
-    # Calculate hA
-    hA = (params['mass'] * params['cp']) / tau_seconds  # W/K
+    # Calculate hS
+    hS = (params['mass'] * params['cp']) / tau_seconds  # W/K
     
     # Calculate absorbed power
     absorbed_power = params['laser_power'] * (1 - 10**(-params['absorbance']))
     
     # Calculate efficiency
-    efficiency = (hA * delta_T_net) / absorbed_power * 100
+    efficiency = (hS * delta_T_net) / absorbed_power * 100
     
     # Determine expected range based on efficiency
     if efficiency < 20:
@@ -2002,7 +2002,7 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
         'efficiency': efficiency,
         'tau_min': tau_min,
         'tau_seconds': tau_seconds,
-        'hA': hA,
+        'hS': hS,
         'absorbed_power': absorbed_power,
         'r_squared': optimal_region['r_squared'],
         'slope': optimal_region['slope'],
@@ -2792,7 +2792,7 @@ def display_pce_tab():
                 st.markdown("#### 📊 Thermal Parameters")
                 st.write(f"**Time Constant (τ):** {results['tau_min']:.3f} mins")
                 st.write(f"**Time Constant (τ):** {results['tau_seconds']:.0f} seconds")
-                st.write(f"**hA Value:** {results['hA']:.4f} W/K")
+                st.write(f"**hS Value:** {results['hS']:.4f} W/K")
                 st.write(f"**ΔT Net:** {results['delta_T_net']:.2f}°C")
             
             st.markdown("---")
@@ -2873,8 +2873,8 @@ def display_pce_tab():
             export_data['Value'].append(results['tau_seconds'])
             export_data['Unit'].append('s')
             
-            export_data['Parameter'].append('hA Value')
-            export_data['Value'].append(results['hA'])
+            export_data['Parameter'].append('hS Value')
+            export_data['Value'].append(results['hS'])
             export_data['Unit'].append('W/K')
             
             export_data['Parameter'].append('PCE')
