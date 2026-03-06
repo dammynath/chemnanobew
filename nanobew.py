@@ -1733,19 +1733,20 @@ def display_advanced_visualization(uploaded_file):
             # Show trend statistics
             st.markdown(f"**Trend Equation:** y = {model.coef_[0]:.4f} * x + {model.intercept_:.4f}")
             st.markdown(f"**R² Score:** {model.score(X, y):.4f}")
-
 # ============================================================================
-# TAB 6: PCE Analyzer - UPDATED with Optimal R² Calculation
+# TAB 6: PCE Analyzer - UPDATED with Adaptive R² (Maximizing Linear Points)
 # ============================================================================
 
-def find_optimal_linear_region(time_values, ln_theta_values, min_points=20):
+def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.98):
     """
-    Find the optimal linear region in the -ln(theta) vs time plot that maximizes R².
+    Find the longest linear region in the -ln(theta) vs time plot that maintains high R².
+    Adaptively extends the region while monitoring R² degradation.
     
     Parameters:
     - time_values: array of time values (minutes)
     - ln_theta_values: array of -ln(theta) values
     - min_points: minimum number of points required for linear fit
+    - r2_threshold: minimum R² value to maintain (default 0.98)
     
     Returns:
     - Dictionary with optimal region parameters
@@ -1763,21 +1764,110 @@ def find_optimal_linear_region(time_values, ln_theta_values, min_points=20):
             'r_squared': r_value**2,
             'n_points': n_points,
             'start_idx': 0,
-            'end_idx': n_points - 1
+            'end_idx': n_points - 1,
+            'method': 'insufficient_data'
         }
     
-    best_r2 = -1
-    best_start = 0
-    best_end = 0
-    best_slope = 0
-    best_intercept = 0
+    # Remove duplicate values (avoid repeated temperature)
+    unique_indices = []
+    seen_values = set()
+    for i, val in enumerate(ln_theta_values):
+        rounded_val = round(val, 4)  # Round to 4 decimal places to detect duplicates
+        if rounded_val not in seen_values:
+            seen_values.add(rounded_val)
+            unique_indices.append(i)
     
-    # Try different windows, focusing on the steepest part (early cooling)
-    for start_idx in range(0, n_points - min_points + 1, max(1, n_points // 20)):
-        for end_idx in range(start_idx + min_points, min(start_idx + n_points // 3, n_points)):
-            if end_idx - start_idx >= min_points:
-                x_window = time_values[start_idx:end_idx]
-                y_window = ln_theta_values[start_idx:end_idx]
+    # If we removed duplicates, use unique indices
+    if len(unique_indices) < n_points:
+        time_unique = time_values[unique_indices]
+        ln_theta_unique = ln_theta_values[unique_indices]
+        n_points = len(time_unique)
+    else:
+        time_unique = time_values
+        ln_theta_unique = ln_theta_values
+    
+    # Strategy 1: Start from the beginning (steepest part) and extend forward
+    best_region = {
+        'start_idx': 0,
+        'end_idx': min_points - 1,
+        'slope': 0,
+        'intercept': 0,
+        'r_squared': 0,
+        'n_points': min_points
+    }
+    
+    # Try different starting points
+    for start_idx in range(0, min(n_points - min_points, 20)):  # Try first 20 starting points
+        current_r2 = 1.0
+        end_idx = start_idx + min_points - 1
+        
+        # Extend forward while R² stays above threshold
+        while end_idx < n_points - 1 and current_r2 >= r2_threshold:
+            end_idx += 1
+            x_window = time_unique[start_idx:end_idx+1]
+            y_window = ln_theta_unique[start_idx:end_idx+1]
+            
+            try:
+                slope, intercept, r_value, _, _ = stats.linregress(x_window, y_window)
+                current_r2 = r_value**2
+                
+                # If this region is longer than our best, update best
+                if (end_idx - start_idx + 1) > best_region['n_points'] and current_r2 >= r2_threshold:
+                    best_region = {
+                        'start_idx': start_idx,
+                        'end_idx': end_idx,
+                        'slope': slope,
+                        'intercept': intercept,
+                        'r_squared': current_r2,
+                        'n_points': end_idx - start_idx + 1,
+                        'start_time': time_unique[start_idx],
+                        'end_time': time_unique[end_idx],
+                        'method': 'forward_extension'
+                    }
+            except:
+                break
+    
+    # Strategy 2: If we couldn't find a long region, try backward from the end
+    if best_region['n_points'] < min_points * 2:
+        for end_idx in range(n_points - 1, n_points - 21, -1):  # Try last 20 points
+            if end_idx < min_points - 1:
+                break
+            
+            current_r2 = 1.0
+            start_idx = end_idx - min_points + 1
+            
+            # Extend backward while R² stays above threshold
+            while start_idx > 0 and current_r2 >= r2_threshold:
+                start_idx -= 1
+                x_window = time_unique[start_idx:end_idx+1]
+                y_window = ln_theta_unique[start_idx:end_idx+1]
+                
+                try:
+                    slope, intercept, r_value, _, _ = stats.linregress(x_window, y_window)
+                    current_r2 = r_value**2
+                    
+                    if (end_idx - start_idx + 1) > best_region['n_points'] and current_r2 >= r2_threshold:
+                        best_region = {
+                            'start_idx': start_idx,
+                            'end_idx': end_idx,
+                            'slope': slope,
+                            'intercept': intercept,
+                            'r_squared': current_r2,
+                            'n_points': end_idx - start_idx + 1,
+                            'start_time': time_unique[start_idx],
+                            'end_time': time_unique[end_idx],
+                            'method': 'backward_extension'
+                        }
+                except:
+                    break
+    
+    # Strategy 3: If still no good region, use highest R² region with at least min_points
+    if best_region['n_points'] < min_points * 1.5:
+        best_r2 = -1
+        for start_idx in range(0, n_points - min_points + 1, max(1, n_points // 10)):
+            for end_idx in range(start_idx + min_points, min(start_idx + n_points // 2, n_points)):
+                x_window = time_unique[start_idx:end_idx+1]
+                y_window = ln_theta_unique[start_idx:end_idx+1]
                 
                 try:
                     slope, intercept, r_value, _, _ = stats.linregress(x_window, y_window)
@@ -1785,41 +1875,60 @@ def find_optimal_linear_region(time_values, ln_theta_values, min_points=20):
                     
                     if r2 > best_r2:
                         best_r2 = r2
-                        best_start = start_idx
-                        best_end = end_idx
-                        best_slope = slope
-                        best_intercept = intercept
+                        best_region = {
+                            'start_idx': start_idx,
+                            'end_idx': end_idx,
+                            'slope': slope,
+                            'intercept': intercept,
+                            'r_squared': r2,
+                            'n_points': end_idx - start_idx + 1,
+                            'start_time': time_unique[start_idx],
+                            'end_time': time_unique[end_idx],
+                            'method': 'max_r2'
+                        }
                 except:
                     continue
     
-    # If no good region found, use the first 60% of data
-    if best_r2 < 0.8 and n_points > min_points * 2:
-        # Fallback: use first 30% of points
-        end_idx = max(min_points, int(n_points * 0.6))
-        x_window = time_values[:end_idx]
-        y_window = ln_theta_values[:end_idx]
-        slope, intercept, r_value, _, _ = stats.linregress(x_window, y_window)
-        best_r2 = r_value**2
-        best_start = 0
-        best_end = end_idx
-        best_slope = slope
-        best_intercept = intercept
+    # Map back to original indices if we used unique indices
+    if len(unique_indices) < len(time_values):
+        best_region['start_idx'] = unique_indices[best_region['start_idx']]
+        best_region['end_idx'] = unique_indices[best_region['end_idx']]
+        best_region['start_time'] = time_values[best_region['start_idx']]
+        best_region['end_time'] = time_values[best_region['end_idx']]
     
-    return {
-        'start_time': time_values[best_start],
-        'end_time': time_values[best_end-1],
-        'slope': best_slope,
-        'intercept': best_intercept,
-        'r_squared': best_r2,
-        'n_points': best_end - best_start,
-        'start_idx': best_start,
-        'end_idx': best_end - 1
-    }
+    return best_region
 
 
-def calculate_pce_optimized(df, peak_idx, params):
+def analyze_r2_progression(time_values, ln_theta_values, max_points=None):
     """
-    Calculate photothermal conversion efficiency using optimized linear region
+    Analyze how R² changes as we add more points to the linear fit.
+    Returns the optimal number of points to use.
+    """
+    if max_points is None:
+        max_points = len(time_values)
+    
+    n_points = min(len(time_values), max_points)
+    r2_values = []
+    point_counts = []
+    
+    for i in range(5, n_points):  # Start with at least 5 points
+        x_window = time_values[:i]
+        y_window = ln_theta_values[:i]
+        
+        try:
+            _, _, r_value, _, _ = stats.linregress(x_window, y_window)
+            r2_values.append(r_value**2)
+            point_counts.append(i)
+        except:
+            pass
+    
+    return point_counts, r2_values
+
+
+def calculate_pce_optimized_adaptive(df, peak_idx, params):
+    """
+    Calculate photothermal conversion efficiency using adaptive linear region selection
+    that maximizes the number of linear points while maintaining high R².
     """
     
     # Get peak information
@@ -1841,14 +1950,15 @@ def calculate_pce_optimized(df, peak_idx, params):
     cooling_data['ln_theta'] = np.log(cooling_data['theta'])
     cooling_data['neg_ln_theta'] = -cooling_data['ln_theta']  # -ln(theta)
     
-    # Find optimal linear region for -ln(theta) vs time
-    optimal_region = find_optimal_linear_region(
+    # Find optimal adaptive linear region
+    optimal_region = find_optimal_linear_region_adaptive(
         cooling_data['time_from_peak'].values,
-        cooling_data['neg_ln_theta'].values
+        cooling_data['neg_ln_theta'].values,
+        min_points=5,
+        r2_threshold=0.98
     )
     
     # Calculate tau from the optimal region slope
-    # slope = 1/τ (in minutes⁻¹)
     tau_min = 1 / optimal_region['slope'] if optimal_region['slope'] > 0 else 200
     tau_seconds = tau_min * 60  # Convert to seconds
     
@@ -1871,20 +1981,19 @@ def calculate_pce_optimized(df, peak_idx, params):
     else:
         expected_range = ">55% (High performance AuNPs/Polymers)"
     
-    # Calculate R² for different windows (for visualization)
-    window_times = []
-    r2_windows = []
+    # Analyze R² progression
+    point_counts, r2_progression = analyze_r2_progression(
+        cooling_data['time_from_peak'].values[:50],  # First 50 points
+        cooling_data['neg_ln_theta'].values[:50]
+    )
     
-    for end_idx in range(5, len(cooling_data), max(1, len(cooling_data)//20)):
-        x_window = cooling_data['time_from_peak'].iloc[:end_idx].values
-        y_window = cooling_data['neg_ln_theta'].iloc[:end_idx].values
-        if len(x_window) >= 5:
-            try:
-                _, _, r_value, _, _ = stats.linregress(x_window, y_window)
-                r2_windows.append(r_value**2)
-                window_times.append(x_window[-1])
-            except:
-                pass
+    # Find where R² starts to drop significantly
+    r2_drop_point = None
+    if len(r2_progression) > 10:
+        for i in range(5, len(r2_progression)):
+            if r2_progression[i] < r2_progression[i-1] - 0.02:  # 2% drop
+                r2_drop_point = point_counts[i]
+                break
     
     return {
         'efficiency': efficiency,
@@ -1900,9 +2009,54 @@ def calculate_pce_optimized(df, peak_idx, params):
         'expected_range': expected_range,
         'optimal_region': optimal_region,
         'cooling_data': cooling_data,
-        'window_times': window_times,
-        'r2_windows': r2_windows
+        'point_counts': point_counts,
+        'r2_progression': r2_progression,
+        'r2_drop_point': r2_drop_point
     }
+
+
+# Update the display_pce_tab function's Analysis tab to use the adaptive version
+# Replace the calculation call in Tab 3 with:
+
+# Calculate PCE using optimized adaptive method
+results = calculate_pce_optimized_adaptive(df, peak_idx, params)
+
+# Display region info with emphasis on number of points used
+opt = results['optimal_region']
+st.info(f"✅ Adaptive linear region found: {opt['n_points']} points from "
+        f"{opt['start_time']:.1f} to {opt['end_time']:.1f} minutes "
+        f"with R² = {opt['r_squared']:.4f} ({opt['method']})")
+
+# Add R² progression plot
+if results['point_counts'] and results['r2_progression']:
+    fig_r2 = go.Figure()
+    fig_r2.add_trace(go.Scatter(
+        x=results['point_counts'],
+        y=results['r2_progression'],
+        mode='lines+markers',
+        name='R² vs Points',
+        line=dict(color='purple', width=2)
+    ))
+    fig_r2.add_hline(
+        y=opt['r_squared'],
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"Selected: {opt['n_points']} pts"
+    )
+    if results['r2_drop_point']:
+        fig_r2.add_vline(
+            x=results['r2_drop_point'],
+            line_dash="dot",
+            line_color="orange",
+            annotation_text=f"Drop at {results['r2_drop_point']} pts"
+        )
+    fig_r2.update_layout(
+        title="R² vs Number of Points (Finding Optimal Length)",
+        xaxis_title="Number of Points",
+        yaxis_title="R² Value",
+        height=300
+    )
+    st.plotly_chart(fig_r2, use_container_width=True)
 
 
 def display_pce_tab():
