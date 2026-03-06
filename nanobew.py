@@ -1804,14 +1804,14 @@ def display_pce_tab():
                     
                     # Ensure correct column names
                     if len(df.columns) >= 2:
-                        df.columns = ['time_h', 'temperature_°C'] + list(df.columns[2:])
+                        df.columns = ['time_mins', 'temperature_°C'] + list(df.columns[2:])
                     
                     st.session_state['pce_data'] = df
             else:
                 df = st.session_state.get('pce_data', None)
         else:
             # Use sample data with proper encoding
-            sample_data = """time_h,temperature_°C
+            sample_data = """time_mins,temperature_°C
 0,20
 0.5,21.8
 1,23.3
@@ -2035,14 +2035,14 @@ def display_pce_tab():
                 
                 # Identify heating and cooling phases
                 temp_peak_idx = df['temperature_°C'].idxmax()
-                peak_time = df.loc[temp_peak_idx, 'time_h']
+                peak_time = df.loc[temp_peak_idx, 'time_mins']
                 peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
                 
                 fig = go.Figure()
                 
                 # Heating phase
                 fig.add_trace(go.Scatter(
-                    x=df['time_h'].iloc[:temp_peak_idx+1],
+                    x=df['time_mins'].iloc[:temp_peak_idx+1],
                     y=df['temperature_°C'].iloc[:temp_peak_idx+1],
                     mode='lines+markers',
                     name='Heating Phase',
@@ -2052,7 +2052,7 @@ def display_pce_tab():
                 
                 # Cooling phase
                 fig.add_trace(go.Scatter(
-                    x=df['time_h'].iloc[temp_peak_idx:],
+                    x=df['time_mins'].iloc[temp_peak_idx:],
                     y=df['temperature_°C'].iloc[temp_peak_idx:],
                     mode='lines+markers',
                     name='Cooling Phase',
