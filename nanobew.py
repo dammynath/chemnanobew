@@ -1217,7 +1217,7 @@ class QDSupervisedLearning:
         return predictions
 
 # ============================================================================
-# COMPLETE FIXED QUANTUM DOTS TAB FUNCTION
+#  QUANTUM DOTS TAB FUNCTION            
 # ============================================================================
 
 def display_quantum_dots_tab(uploaded_file):
@@ -1862,7 +1862,7 @@ def display_quantum_dots_tab(uploaded_file):
             st.metric("Total Experiments", len(data))
             
             if target_property in data.columns:
-                st.metric(f"Best {target_property}", f"{data[target_property].max():.2f}")
+                st.metric(f"Best {target_property}", f"{data[target_property].max()}")
                 st.metric(f"Mean {target_property}", f"{data[target_property].mean():.2f}")
         
         if st.button("🎯 Suggest Next Experiments", use_container_width=True):
