@@ -2017,8 +2017,8 @@ def display_quantum_dots_tab(uploaded_file):
                         
                         st.plotly_chart(fig, use_container_width=True)
     
-    # ========================================================================
-    # Tab 6: Supervised Learning - FIXED with proper imports
+   # ========================================================================
+    # Tab 6: Supervised Learning - COMPLETELY REWRITTEN with error handling
     # ========================================================================
     with qd_tabs[5]:
         st.markdown("### 📈 Supervised Learning for Property Prediction")
@@ -2029,6 +2029,35 @@ def display_quantum_dots_tab(uploaded_file):
         Compare model performance and optimize hyperparameters.
         </div>
         """, unsafe_allow_html=True)
+        
+        # First, check if scikit-learn is available
+        try:
+            import sklearn
+            sklearn_available = True
+            st.sidebar.success(f"✅ scikit-learn {sklearn.__version__} available")
+        except ImportError:
+            sklearn_available = False
+            st.error("❌ scikit-learn is not installed. Please install it with: pip install scikit-learn")
+            st.stop()
+        
+        # Now try to import the specific classes we need
+        try:
+            from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+            from sklearn.tree import DecisionTreeRegressor
+            from sklearn.linear_model import LinearRegression, Ridge, Lasso
+            from sklearn.svm import SVR
+            from sklearn.neural_network import MLPRegressor
+            from sklearn.model_selection import train_test_split, cross_val_score
+            from sklearn.preprocessing import StandardScaler
+            from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+            imports_successful = True
+        except ImportError as e:
+            st.error(f"Failed to import scikit-learn classes: {str(e)}")
+            st.info("Please ensure scikit-learn is properly installed")
+            imports_successful = False
+        
+        if not imports_successful:
+            st.stop()
         
         col1, col2 = st.columns(2)
         
@@ -2047,27 +2076,31 @@ def display_quantum_dots_tab(uploaded_file):
                 target_var = None
             
             if qd_type == "CIS-Te/ZnS":
-                default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time']
+                default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
             else:
                 default_features = [c for c in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
-                                  if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:3]
+                                  if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:4]
             
             # Filter feature variables to only include columns that exist and are numeric
             available_features = [c for c in data.columns if c != target_var and pd.api.types.is_numeric_dtype(data[c])]
             
-            feature_vars = st.multiselect(
-                "Feature Variables",
-                available_features,
-                default=[f for f in default_features if f in available_features][:3],
-                key="sl_features"
-            )
+            if len(available_features) == 0:
+                st.warning("No numeric feature columns available")
+                feature_vars = []
+            else:
+                feature_vars = st.multiselect(
+                    "Feature Variables",
+                    available_features,
+                    default=[f for f in default_features if f in available_features][:3],
+                    key="sl_features"
+                )
             
             test_size = st.slider("Test Set Size", 0.1, 0.4, 0.2, key="sl_test")
             
             model_types = st.multiselect(
                 "Model Types",
                 ["Linear Regression", "Ridge Regression", "Lasso Regression", 
-                 "Decision Tree", "Random Forest", "Gradient Boosting", "SVR", "Neural Network"],
+                 "Decision Tree", "Random Forest", "Gradient Boosting", "SVR"],
                 default=["Random Forest", "Gradient Boosting"],
                 key="sl_models"
             )
@@ -2095,13 +2128,8 @@ def display_quantum_dots_tab(uploaded_file):
         
         if feature_vars and target_var and st.button("🚀 Train Models", use_container_width=True):
             with st.spinner("Training supervised learning models..."):
+                
                 # Prepare data
-                sl = QDSupervisedLearning()
-                
-                # Handle categorical features (if any)
-                categorical = [c for c in feature_vars if data[c].dtype == 'object']
-                
-                # Prepare feature matrix
                 X = data[feature_vars].copy()
                 y = data[target_var].copy()
                 
@@ -2123,130 +2151,154 @@ def display_quantum_dots_tab(uploaded_file):
                 y = y[valid_idx]
                 
                 if len(X) < 10:
-                    st.error("Not enough valid data points after cleaning")
+                    st.error("Not enough valid data points after cleaning (need at least 10)")
                 else:
-                    # Train models - use imported classes directly
+                    # Train models - create dictionary with imported classes
                     model_dict = {}
+                    
+                    # Explicitly create each model with error handling
                     for name in model_types:
-                        if name == "Linear Regression":
-                            model_dict[name] = LinearRegression()
-                        elif name == "Ridge Regression":
-                            model_dict[name] = Ridge(alpha=1.0)
-                        elif name == "Lasso Regression":
-                            model_dict[name] = Lasso(alpha=0.01)
-                        elif name == "Decision Tree":
-                            model_dict[name] = DecisionTreeRegressor(max_depth=5, random_state=42)
-                        elif name == "Random Forest":
-                            model_dict[name] = RandomForestRegressor(n_estimators=100, random_state=42)
-                        elif name == "Gradient Boosting":
-                            model_dict[name] = GradientBoostingRegressor(n_estimators=100, random_state=42)
-                        elif name == "SVR":
-                            model_dict[name] = SVR(kernel='rbf', C=100, gamma=0.1)
-                        elif name == "Neural Network":
-                            model_dict[name] = MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, random_state=42)
-                    
-                    # Split data
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
-                    
-                    # Scale features
-                    scaler = StandardScaler()
-                    X_train_scaled = scaler.fit_transform(X_train)
-                    X_test_scaled = scaler.transform(X_test)
-                    
-                    results = {}
-                    for name, model in model_dict.items():
                         try:
-                            model.fit(X_train_scaled, y_train)
-                            y_pred = model.predict(X_test_scaled)
-                            
-                            r2 = r2_score(y_test, y_pred)
-                            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                            mae = mean_absolute_error(y_test, y_pred)
-                            
-                            # Cross-validation
-                            cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='r2')
-                            
-                            results[name] = {
-                                'model': model,
-                                'r2': r2,
-                                'rmse': rmse,
-                                'mae': mae,
-                                'cv_mean': cv_scores.mean(),
-                                'cv_std': cv_scores.std()
-                            }
-                            
-                            # Store feature importance if available
-                            if hasattr(model, 'feature_importances_'):
-                                results[name]['feature_importance'] = model.feature_importances_
-                            elif hasattr(model, 'coef_'):
-                                results[name]['feature_importance'] = np.abs(model.coef_)
-                                
+                            if name == "Linear Regression":
+                                model_dict[name] = LinearRegression()
+                            elif name == "Ridge Regression":
+                                model_dict[name] = Ridge(alpha=1.0)
+                            elif name == "Lasso Regression":
+                                model_dict[name] = Lasso(alpha=0.01)
+                            elif name == "Decision Tree":
+                                model_dict[name] = DecisionTreeRegressor(max_depth=5, random_state=42)
+                            elif name == "Random Forest":
+                                # Explicit import inside the loop as a fallback
+                                try:
+                                    from sklearn.ensemble import RandomForestRegressor
+                                    model_dict[name] = RandomForestRegressor(n_estimators=100, random_state=42)
+                                except ImportError as e:
+                                    st.warning(f"Could not import RandomForestRegressor: {e}")
+                                    continue
+                            elif name == "Gradient Boosting":
+                                try:
+                                    from sklearn.ensemble import GradientBoostingRegressor
+                                    model_dict[name] = GradientBoostingRegressor(n_estimators=100, random_state=42)
+                                except ImportError as e:
+                                    st.warning(f"Could not import GradientBoostingRegressor: {e}")
+                                    continue
+                            elif name == "SVR":
+                                model_dict[name] = SVR(kernel='rbf', C=100, gamma=0.1)
                         except Exception as e:
-                            st.warning(f"Error training {name}: {str(e)}")
+                            st.warning(f"Error creating model {name}: {str(e)}")
                             continue
                     
-                    if results:
-                        # Display results
-                        st.markdown("#### Model Performance Comparison")
+                    if len(model_dict) == 0:
+                        st.error("No models could be created. Please check your scikit-learn installation.")
+                    else:
+                        # Split data
+                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
                         
-                        results_df = pd.DataFrame([
-                            {
-                                'Model': name,
-                                'R² Score': res['r2'],
-                                'RMSE': res['rmse'],
-                                'MAE': res['mae'],
-                                'CV Mean': res['cv_mean'],
-                                'CV Std': res['cv_std']
-                            }
-                            for name, res in results.items()
-                        ]).sort_values('R² Score', ascending=False)
+                        # Scale features
+                        scaler = StandardScaler()
+                        X_train_scaled = scaler.fit_transform(X_train)
+                        X_test_scaled = scaler.transform(X_test)
                         
-                        st.dataframe(results_df, use_container_width=True)
+                        results = {}
+                        for name, model in model_dict.items():
+                            try:
+                                model.fit(X_train_scaled, y_train)
+                                y_pred = model.predict(X_test_scaled)
+                                
+                                r2 = r2_score(y_test, y_pred)
+                                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                                mae = mean_absolute_error(y_test, y_pred)
+                                
+                                # Cross-validation
+                                cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=min(5, len(X_train_scaled)), scoring='r2')
+                                
+                                results[name] = {
+                                    'model': model,
+                                    'r2': r2,
+                                    'rmse': rmse,
+                                    'mae': mae,
+                                    'cv_mean': cv_scores.mean() if len(cv_scores) > 0 else 0,
+                                    'cv_std': cv_scores.std() if len(cv_scores) > 0 else 0
+                                }
+                                
+                                # Store feature importance if available
+                                if hasattr(model, 'feature_importances_'):
+                                    results[name]['feature_importance'] = model.feature_importances_
+                                elif hasattr(model, 'coef_'):
+                                    results[name]['feature_importance'] = np.abs(model.coef_)
+                                    
+                            except Exception as e:
+                                st.warning(f"Error training {name}: {str(e)}")
+                                continue
                         
-                        # Plot comparison
-                        fig = go.Figure()
-                        fig.add_trace(go.Bar(
-                            x=results_df['Model'],
-                            y=results_df['R² Score'],
-                            name='R² Score',
-                            marker_color='lightblue'
-                        ))
-                        if results_df['RMSE'].max() > 0:
+                        if results:
+                            # Display results
+                            st.markdown("#### Model Performance Comparison")
+                            
+                            results_df = pd.DataFrame([
+                                {
+                                    'Model': name,
+                                    'R² Score': res['r2'],
+                                    'RMSE': res['rmse'],
+                                    'MAE': res['mae'],
+                                    'CV Mean': res['cv_mean'],
+                                    'CV Std': res['cv_std']
+                                }
+                                for name, res in results.items()
+                            ]).sort_values('R² Score', ascending=False)
+                            
+                            st.dataframe(results_df, use_container_width=True)
+                            
+                            # Plot comparison
+                            fig = go.Figure()
                             fig.add_trace(go.Bar(
                                 x=results_df['Model'],
-                                y=results_df['RMSE'] / results_df['RMSE'].max(),
-                                name='Normalized RMSE',
-                                marker_color='lightcoral',
-                                opacity=0.7
+                                y=results_df['R² Score'],
+                                name='R² Score',
+                                marker_color='lightblue'
                             ))
-                        fig.update_layout(
-                            title="Model Performance Comparison",
-                            xaxis_title="Model",
-                            yaxis_title="Score",
-                            barmode='group',
-                            height=400
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Feature importance for best model
-                        best_model = results_df.iloc[0]['Model']
-                        if best_model in results and 'feature_importance' in results[best_model]:
-                            importance = results[best_model]['feature_importance']
-                            
-                            fig2 = go.Figure()
-                            fig2.add_trace(go.Bar(
-                                x=feature_vars,
-                                y=importance[:len(feature_vars)] if len(importance) >= len(feature_vars) else importance,
-                                name='Feature Importance',
-                                marker_color='green'
-                            ))
-                            fig2.update_layout(
-                                title=f"Feature Importance ({best_model})",
-                                xaxis_title="Feature",
-                                yaxis_title="Importance",
-                                height=300
+                            if results_df['RMSE'].max() > 0:
+                                fig.add_trace(go.Bar(
+                                    x=results_df['Model'],
+                                    y=results_df['RMSE'] / results_df['RMSE'].max(),
+                                    name='Normalized RMSE',
+                                    marker_color='lightcoral',
+                                    opacity=0.7
+                                ))
+                            fig.update_layout(
+                                title="Model Performance Comparison",
+                                xaxis_title="Model",
+                                yaxis_title="Score",
+                                barmode='group',
+                                height=400
                             )
-                            st.plotly_chart(fig2, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Feature importance for best model
+                            best_model = results_df.iloc[0]['Model']
+                            if best_model in results and 'feature_importance' in results[best_model]:
+                                importance = results[best_model]['feature_importance']
+                                
+                                # Ensure importance length matches feature_vars
+                                if len(importance) >= len(feature_vars):
+                                    importance_display = importance[:len(feature_vars)]
+                                else:
+                                    importance_display = np.pad(importance, (0, len(feature_vars) - len(importance)), 'constant')
+                                
+                                fig2 = go.Figure()
+                                fig2.add_trace(go.Bar(
+                                    x=feature_vars,
+                                    y=importance_display,
+                                    name='Feature Importance',
+                                    marker_color='green'
+                                ))
+                                fig2.update_layout(
+                                    title=f"Feature Importance ({best_model})",
+                                    xaxis_title="Feature",
+                                    yaxis_title="Importance",
+                                    height=300
+                                )
+                                st.plotly_chart(fig2, use_container_width=True)
 
     
     # ========================================================================
