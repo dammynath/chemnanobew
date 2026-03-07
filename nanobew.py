@@ -421,7 +421,7 @@ class DataManager:
             'temperature': np.random.uniform(150, 250, n),
             'reaction_time': np.random.uniform(30, 180, n),
             'zn_precursor': np.random.uniform(0.1, 1.0, n),
-            'ph': np.random.uniform(4, 10, n),
+            'pH': np.random.uniform(4, 10, n),
             'surfactant': np.random.choice(['oleic_acid', 'oleylamine', 'dodecanethiol'], n),
             'solvent': np.random.choice(['octadecene', 'toluene', 'chloroform'], n),
             'absorption_nm': np.random.normal(700, 100, n),
@@ -589,13 +589,13 @@ class QDDataManager:
                 'description': 'Copper Indium Sulfide / Zinc Sulfide core/shell QDs',
                 'optimal_absorption': '650-850 nm',
                 'optimal_plqy': '50-80%',
-                'key_params': ['cu_in_ratio', 'temperature', 'time', 'zn_precursor', 'ph']
+                'key_params': ['cu_in_ratio', 'temperature', 'time', 'zn_precursor', 'pH']
             },
             'AIS/ZnS': {
                 'description': 'Silver Indium Sulfide / Zinc Sulfide core/shell QDs',
                 'optimal_absorption': '550-750 nm',
                 'optimal_plqy': '40-70%',
-                'key_params': ['ag_in_ratio', 'temperature', 'time', 'zn_precursor', 'ph']
+                'key_params': ['ag_in_ratio', 'temperature', 'time', 'zn_precursor', 'pH']
             },
             'CdSe/CdS': {
                 'description': 'Cadmium Selenide / Cadmium Sulfide core/shell QDs',
@@ -607,7 +607,7 @@ class QDDataManager:
                 'description': 'Carbon-based fluorescent nanoparticles',
                 'optimal_absorption': '350-500 nm',
                 'optimal_plqy': '20-60%',
-                'key_params': ['precursor_ratio', 'temperature', 'time', 'ph', 'microwave_power']
+                'key_params': ['precursor_ratio', 'temperature', 'time', 'pH', 'microwave_power']
             },
             'Metal Nanoparticles': {
                 'description': 'Au, Ag, Cu nanoparticles',
@@ -627,7 +627,7 @@ class QDDataManager:
                 'temperature': np.random.uniform(150, 250, n_samples),
                 'time': np.random.uniform(30, 180, n_samples),
                 'zn_precursor': np.random.uniform(0.1, 1.0, n_samples),
-                'ph': np.random.uniform(4, 10, n_samples),
+                'pH': np.random.uniform(4, 10, n_samples),
                 'surfactant': np.random.choice(['oleic_acid', 'oleylamine', 'dodecanethiol'], n_samples),
                 'absorption_nm': np.random.normal(750, 100, n_samples),
                 'plqy_percent': np.random.normal(65, 15, n_samples),
@@ -642,7 +642,7 @@ class QDDataManager:
                 'temperature': np.random.uniform(140, 220, n_samples),
                 'time': np.random.uniform(30, 150, n_samples),
                 'zn_precursor': np.random.uniform(0.1, 0.8, n_samples),
-                'ph': np.random.uniform(5, 9, n_samples),
+                'pH': np.random.uniform(5, 9, n_samples),
                 'surfactant': np.random.choice(['oleic_acid', 'oleylamine', 'TOP'], n_samples),
                 'absorption_nm': np.random.normal(650, 80, n_samples),
                 'plqy_percent': np.random.normal(55, 12, n_samples),
@@ -670,7 +670,7 @@ class QDDataManager:
                 'precursor_ratio': np.random.uniform(1, 5, n_samples),
                 'temperature': np.random.uniform(150, 250, n_samples),
                 'time': np.random.uniform(30, 180, n_samples),
-                'ph': np.random.uniform(3, 10, n_samples),
+                'pH': np.random.uniform(3, 10, n_samples),
                 'microwave_power': np.random.uniform(300, 800, n_samples),
                 'absorption_nm': np.random.normal(420, 50, n_samples),
                 'plqy_percent': np.random.normal(40, 15, n_samples),
@@ -1358,7 +1358,7 @@ def display_quantum_dots_tab(uploaded_file):
             temperature = st.slider("Temperature (°C)", 150, 280, (180, 240), key="cite_temp")
             time_val = st.slider("Reaction Time (min)", 30, 240, (60, 150), key="cite_time")
             zn_precursor = st.slider("Zn Precursor (M)", 0.1, 1.0, (0.2, 0.6), key="cite_zn")
-            ph_val = st.slider("pH", 4.0, 10.0, (5.5, 7.5), key="cite_ph")
+            pH_val = st.slider("pH", 4.0, 10.0, (5.5, 7.5), key="cite_pH")
             
             ranges = {
                 "cu_in_ratio": cu_in_ratio,
@@ -1366,7 +1366,7 @@ def display_quantum_dots_tab(uploaded_file):
                 "temperature": temperature,
                 "time": time_val,
                 "zn_precursor": zn_precursor,
-                "ph": ph_val
+                "pH": pH_val
             }
             
             # Surfactant selection
@@ -1402,7 +1402,7 @@ def display_quantum_dots_tab(uploaded_file):
                 cite_df = pd.read_csv(cite_uploaded)
                 # Ensure numeric columns are properly typed
                 for col in cite_df.columns:
-                    if col in ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph', 
+                    if col in ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH', 
                               'absorption_nm', 'intensity', 'plqy_percent']:
                         cite_df[col] = pd.to_numeric(cite_df[col], errors='coerce')
                 cite_df = cite_df.dropna()
@@ -1410,11 +1410,11 @@ def display_quantum_dots_tab(uploaded_file):
             except Exception as e:
                 st.error(f"Error loading file: {e}")
                 cite_df = generate_cis_te_data(n_samples=40)
-                cite_df["intensity"] = 15000 + 5000 * (cite_df["te_content"] - 5) / 5 + 2000 * (cite_df["ph"] - 6)
+                cite_df["intensity"] = 15000 + 5000 * (cite_df["te_content"] - 5) / 5 + 2000 * (cite_df["pH"] - 6)
         else:
             with st.spinner("Generating synthetic CIS-Te/ZnS data..."):
                 cite_df = generate_cis_te_data(n_samples=40)
-                cite_df["intensity"] = 15000 + 5000 * (cite_df["te_content"] - 5) / 5 + 2000 * (cite_df["ph"] - 6)
+                cite_df["intensity"] = 15000 + 5000 * (cite_df["te_content"] - 5) / 5 + 2000 * (cite_df["pH"] - 6)
             st.info("📊 Using synthetic CIS-Te/ZnS data. Upload your own CSV for real optimization.")
         
         st.dataframe(cite_df.head(10), use_container_width=True)
@@ -1428,7 +1428,7 @@ def display_quantum_dots_tab(uploaded_file):
                     from sklearn.ensemble import RandomForestRegressor
                     
                     # Prepare features - ensure numeric
-                    feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                    feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                     # Check if all feature columns exist
                     available_features = [f for f in feature_cols if f in cite_df.columns]
                     
@@ -1475,7 +1475,7 @@ def display_quantum_dots_tab(uploaded_file):
                                 Real(temperature[0], temperature[1], name='temperature'),
                                 Real(time_val[0], time_val[1], name='time'),
                                 Real(zn_precursor[0], zn_precursor[1], name='zn_precursor'),
-                                Real(ph_val[0], ph_val[1], name='ph')
+                                Real(pH_val[0], pH_val[1], name='pH')
                             ]
                             
                             def objective(params):
@@ -1500,7 +1500,7 @@ def display_quantum_dots_tab(uploaded_file):
                                 'temperature': result.x[2],
                                 'time': result.x[3],
                                 'zn_precursor': result.x[4],
-                                'ph': result.x[5]
+                                'pH': result.x[5]
                             }
                             
                             st.success("✅ Optimal conditions found:")
@@ -1522,8 +1522,8 @@ def display_quantum_dots_tab(uploaded_file):
                             st.warning("scikit-optimize not installed. Using random search...")
                             # Fallback to random search
                             best_params = {}
-                            param_names = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
-                            ranges = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, ph]
+                            param_names = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
+                            ranges = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, pH]
                             
                             for param, (low, high) in zip(param_names, ranges):
                                 best_params[param] = np.random.uniform(low, high)
@@ -1539,7 +1539,7 @@ def display_quantum_dots_tab(uploaded_file):
                 from sklearn.ensemble import RandomForestRegressor
                 
                 # Prepare features
-                feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                 available_features = [f for f in feature_cols if f in cite_df.columns]
                 
                 if len(available_features) >= 2 and 'absorption_nm' in cite_df.columns and 'intensity' in cite_df.columns:
@@ -1555,7 +1555,7 @@ def display_quantum_dots_tab(uploaded_file):
                     # Generate grid of points
                     n_grid = 10  # Reduced for performance
                     grid_points = []
-                    ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, ph]
+                    ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, pH]
                     for i, param in enumerate(available_features):
                         low, high = ranges_list[i]
                         grid_points.append(np.linspace(low, high, n_grid))
@@ -1620,13 +1620,13 @@ def display_quantum_dots_tab(uploaded_file):
                 if 'absorption_nm' in cite_df.columns:
                     # Simple RL-inspired suggestion
                     best_idx = cite_df['absorption_nm'].idxmax()
-                    param_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                    param_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                     available_params = [p for p in param_cols if p in cite_df.columns]
                     
                     best_params = cite_df.loc[best_idx, available_params].to_dict()
                     
                     suggestion = {}
-                    ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, ph]
+                    ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, pH]
                     for i, param in enumerate(available_params):
                         low, high = ranges_list[i]
                         # Add exploration noise
@@ -1654,7 +1654,7 @@ def display_quantum_dots_tab(uploaded_file):
             # Dynamic input fields based on QD type
             inputs = {}
             if qd_type == "CIS-Te/ZnS":
-                params = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                params = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
             else:
                 params = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
             
@@ -1689,7 +1689,7 @@ def display_quantum_dots_tab(uploaded_file):
                 with st.spinner("Training prediction models..."):
                     # Prepare features and targets
                     if qd_type == "CIS-Te/ZnS":
-                        feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                        feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                     else:
                         feature_cols = [p for p in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
                                       if p in data.columns and pd.api.types.is_numeric_dtype(data[p])]
@@ -1788,7 +1788,7 @@ def display_quantum_dots_tab(uploaded_file):
             # Get factor ranges from data - only numeric columns
             factors = {}
             if qd_type == "CIS-Te/ZnS":
-                param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
             else:
                 param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
             
@@ -1925,7 +1925,7 @@ def display_quantum_dots_tab(uploaded_file):
                 # Define factor ranges from numeric columns only
                 factor_ranges = {}
                 if qd_type == "CIS-Te/ZnS":
-                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                 else:
                     param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
@@ -2334,7 +2334,7 @@ def display_quantum_dots_tab(uploaded_file):
                 ## Key Parameters
                 """
                 if qd_type == "CIS-Te/ZnS":
-                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                 else:
                     param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
@@ -2363,7 +2363,7 @@ def generate_cis_te_data(n_samples=50):
         'temperature': np.random.uniform(160, 260, n_samples).astype(float),
         'time': np.random.uniform(45, 210, n_samples).astype(float),
         'zn_precursor': np.random.uniform(0.15, 0.8, n_samples).astype(float),
-        'ph': np.random.uniform(5.0, 8.5, n_samples).astype(float),
+        'pH': np.random.uniform(5.0, 8.5, n_samples).astype(float),
         'surfactant': np.random.choice(['oleic_acid', 'oleylamine', 'dodecanethiol', 'TOP'], n_samples),
     }
     
@@ -2976,7 +2976,7 @@ def display_advanced_visualization(uploaded_file):
         # Define parameter categories for QDs
         param_categories = {
             "Precursor Parameters": ['precursor_ratio', 'zn_precursor'],
-            "Reaction Parameters": ['temperature', 'reaction_time', 'ph'],
+            "Reaction Parameters": ['temperature', 'reaction_time', 'pH'],
             "Optical Properties": ['absorption_nm', 'plqy_percent', 'pce_percent', 'soq_au'],
             "Categorical": ['surfactant', 'solvent']
         }
