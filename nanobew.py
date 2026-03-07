@@ -1641,7 +1641,7 @@ def display_quantum_dots_tab(uploaded_file):
                     st.error("No absorption data available")
     
     # ========================================================================
-    # Tab 3: Molecular & Optical Properties
+    # Tab 3: Molecular & Optical Properties - FIXED with column checks
     # ========================================================================
     with qd_tabs[2]:
         st.markdown("### 🔮 Molecular and Optical Property Predictions")
@@ -1659,7 +1659,7 @@ def display_quantum_dots_tab(uploaded_file):
                 params = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
             
             for param in params:
-                if param in data.columns:
+                if param in data.columns and pd.api.types.is_numeric_dtype(data[param]):
                     min_val = float(data[param].min())
                     max_val = float(data[param].max())
                     default_val = float(data[param].mean())
@@ -1670,15 +1670,17 @@ def display_quantum_dots_tab(uploaded_file):
                         key=f"input_{param}"
                     )
             
-            # Add categorical if present
+            # Add categorical if present - with existence check
             categorical_params = ['surfactant', 'stabilizer']
             for param in categorical_params:
                 if param in data.columns:
-                    inputs[param] = st.selectbox(
-                        f"{param.replace('_', ' ').title()}",
-                        data[param].unique(),
-                        key=f"cat_{param}"
-                    )
+                    unique_values = data[param].dropna().unique().tolist()
+                    if unique_values:
+                        inputs[param] = st.selectbox(
+                            f"{param.replace('_', ' ').title()}",
+                            unique_values,
+                            key=f"cat_{param}"
+                        )
         
         with col2:
             st.markdown("#### Predicted Properties")
@@ -1690,49 +1692,83 @@ def display_quantum_dots_tab(uploaded_file):
                         feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
                     else:
                         feature_cols = [p for p in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
-                                      if p in data.columns]
+                                      if p in data.columns and pd.api.types.is_numeric_dtype(data[p])]
                     
-                    # Handle categorical
-                    X = pd.get_dummies(data[feature_cols], columns=['surfactant', 'stabilizer'] 
-                                     if any(c in data.columns for c in ['surfactant', 'stabilizer']) 
-                                     else [])
-                    
-                    # Prepare targets
-                    y_dict = {}
-                    for target in ['absorption_nm', 'plqy_percent', 'fwhm_nm', 'quantum_yield', 'intensity']:
-                        if target in data.columns:
-                            y_dict[target] = data[target].values
-                    
-                    # Train predictor
-                    predictor = QDOpticalPropertyPredictor()
-                    results = predictor.train_models(X.values, y_dict)
-                    
-                    # Prepare input for prediction
-                    input_df = pd.DataFrame([inputs])
-                    input_encoded = pd.get_dummies(input_df, columns=['surfactant', 'stabilizer']
-                                                 if any(c in input_df.columns for c in ['surfactant', 'stabilizer'])
-                                                 else [])
-                    
-                    # Ensure columns match
-                    for col in X.columns:
-                        if col not in input_encoded.columns:
-                            input_encoded[col] = 0
-                    
-                    input_encoded = input_encoded[X.columns]
-                    
-                    # Make predictions
-                    predictions = predictor.predict_properties(input_encoded.values)
-                    
-                    # Display predictions
-                    for prop, value in predictions.items():
-                        st.metric(
-                            prop.replace('_', ' ').title(),
-                            f"{value:.2f}",
-                            f"Model R²: {results[prop]['r2']:.3f}" if prop in results else ""
-                        )
+                    # Check if we have enough features
+                    if len(feature_cols) < 2:
+                        st.error("Not enough numeric feature columns for prediction")
+                    else:
+                        # Get only numeric columns that exist
+                        X_numeric = data[feature_cols].copy()
+                        
+                        # Handle categorical columns if they exist
+                        categorical_cols = []
+                        for col in ['surfactant', 'stabilizer']:
+                            if col in data.columns:
+                                categorical_cols.append(col)
+                        
+                        # Create feature matrix with one-hot encoding for categoricals
+                        if categorical_cols:
+                            X_categorical = pd.get_dummies(data[categorical_cols], prefix=categorical_cols)
+                            X = pd.concat([X_numeric, X_categorical], axis=1)
+                        else:
+                            X = X_numeric
+                        
+                        # Prepare targets (only numeric columns)
+                        y_dict = {}
+                        for target in ['absorption_nm', 'plqy_percent', 'fwhm_nm', 'quantum_yield', 'intensity']:
+                            if target in data.columns and pd.api.types.is_numeric_dtype(data[target]):
+                                y_dict[target] = data[target].values
+                        
+                        if not y_dict:
+                            st.error("No numeric target columns found")
+                        else:
+                            # Train predictor
+                            predictor = QDOpticalPropertyPredictor()
+                            results = predictor.train_models(X.values, y_dict)
+                            
+                            # Prepare input for prediction
+                            input_df = pd.DataFrame([inputs])
+                            
+                            # Create input with same columns as training data
+                            input_numeric = pd.DataFrame()
+                            for col in feature_cols:
+                                if col in input_df.columns:
+                                    input_numeric[col] = input_df[col]
+                                else:
+                                    input_numeric[col] = 0
+                            
+                            # Handle categorical inputs
+                            if categorical_cols:
+                                input_categorical = pd.get_dummies(input_df[categorical_cols], prefix=categorical_cols)
+                                # Ensure all columns from training are present
+                                for col in X_categorical.columns:
+                                    if col not in input_categorical.columns:
+                                        input_categorical[col] = 0
+                                input_encoded = pd.concat([input_numeric, input_categorical], axis=1)
+                            else:
+                                input_encoded = input_numeric
+                            
+                            # Ensure columns match training data
+                            for col in X.columns:
+                                if col not in input_encoded.columns:
+                                    input_encoded[col] = 0
+                            
+                            input_encoded = input_encoded[X.columns]
+                            
+                            # Make predictions
+                            predictions = predictor.predict_properties(input_encoded.values)
+                            
+                            # Display predictions
+                            for prop, value in predictions.items():
+                                st.metric(
+                                    prop.replace('_', ' ').title(),
+                                    f"{value:.2f}",
+                                    f"Model R²: {results[prop]['r2']:.3f}" if prop in results else ""
+                                )
     
     # ========================================================================
-    # Tab 4: Design of Experiments
+    # Tab 4: Design of Experiments - FIXED with column checks
     # ========================================================================
     with qd_tabs[3]:
         st.markdown("### 📐 Design of Experiments for QD Synthesis")
@@ -1749,15 +1785,17 @@ def display_quantum_dots_tab(uploaded_file):
         with col1:
             st.markdown("#### Factor Ranges")
             
-            # Get factor ranges from data
+            # Get factor ranges from data - only numeric columns
             factors = {}
             if qd_type == "CIS-Te/ZnS":
                 param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
             else:
                 param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
             
+            available_params = []
             for param in param_list:
-                if param in data.columns and data[param].dtype in ['float64', 'int64']:
+                if param in data.columns and pd.api.types.is_numeric_dtype(data[param]):
+                    available_params.append(param)
                     min_val = float(data[param].min())
                     max_val = float(data[param].max())
                     
@@ -1767,64 +1805,70 @@ def display_quantum_dots_tab(uploaded_file):
                         key=f"range_{param}"
                     )
                     factors[param] = range_vals
+            
+            if len(factors) == 0:
+                st.warning("No numeric parameters available for DoE")
         
         with col2:
             st.markdown("#### Design Parameters")
             
-            doe = QDDesignOfExperiments()
-            
-            design_type = st.selectbox(
-                "Design Type",
-                list(doe.design_types.keys()),
-                key="doe_type"
-            )
-            
-            if design_type in ['Latin Hypercube', 'D-Optimal']:
-                n_experiments = st.number_input("Number of Experiments", 10, 200, 30, key="doe_n")
-            else:
-                n_experiments = None
-            
-            include_center = st.checkbox("Include Center Points", value=True, key="doe_center")
-            n_center = st.number_input("Number of Center Points", 1, 10, 3, key="doe_center_n") if include_center else 0
-        
-        if st.button("🎲 Generate Experimental Design", use_container_width=True):
-            with st.spinner("Generating design..."):
-                # Generate design
-                if design_type == 'Latin Hypercube' and n_experiments:
-                    design = doe.latin_hypercube_design(factors, n_experiments)
-                elif design_type == 'D-Optimal' and n_experiments:
-                    design = doe.d_optimal_design(factors, n_experiments)
-                else:
-                    design_func = doe.design_types[design_type]
-                    design = design_func(factors)
+            if len(factors) > 0:
+                doe = QDDesignOfExperiments()
                 
-                # Add center points if requested
-                if include_center and n_center > 0:
-                    center_point = {name: np.mean(factors[name]) for name in factors.keys()}
-                    center_df = pd.DataFrame([center_point] * n_center)
-                    center_df['run_order'] = np.arange(len(design)+1, len(design)+n_center+1)
-                    design = pd.concat([design, center_df], ignore_index=True)
-                    design = design.sample(frac=1).reset_index(drop=True)
-                
-                st.success(f"✅ Generated {len(design)} experimental runs")
-                st.dataframe(design, use_container_width=True)
-                
-                # Download design
-                csv = design.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Design as CSV",
-                    data=csv,
-                    file_name=f"qd_doe_{qd_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
+                design_type = st.selectbox(
+                    "Design Type",
+                    list(doe.design_types.keys()),
+                    key="doe_type"
                 )
                 
-                # Visualize design space
-                if len(factors) >= 2:
-                    fig = px.scatter_matrix(
-                        design[list(factors.keys())],
-                        title=f"{design_type} Design Space"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                if design_type in ['Latin Hypercube', 'D-Optimal']:
+                    n_experiments = st.number_input("Number of Experiments", 10, 200, 30, key="doe_n")
+                else:
+                    n_experiments = None
+                
+                include_center = st.checkbox("Include Center Points", value=True, key="doe_center")
+                n_center = st.number_input("Number of Center Points", 1, 10, 3, key="doe_center_n") if include_center else 0
+                
+                if st.button("🎲 Generate Experimental Design", use_container_width=True):
+                    with st.spinner("Generating design..."):
+                        # Generate design
+                        if design_type == 'Latin Hypercube' and n_experiments:
+                            design = doe.latin_hypercube_design(factors, n_experiments)
+                        elif design_type == 'D-Optimal' and n_experiments:
+                            design = doe.d_optimal_design(factors, n_experiments)
+                        else:
+                            design_func = doe.design_types[design_type]
+                            design = design_func(factors)
+                        
+                        # Add center points if requested
+                        if include_center and n_center > 0:
+                            center_point = {name: np.mean(factors[name]) for name in factors.keys()}
+                            center_df = pd.DataFrame([center_point] * n_center)
+                            center_df['run_order'] = np.arange(len(design)+1, len(design)+n_center+1)
+                            design = pd.concat([design, center_df], ignore_index=True)
+                            design = design.sample(frac=1).reset_index(drop=True)
+                        
+                        st.success(f"✅ Generated {len(design)} experimental runs")
+                        st.dataframe(design, use_container_width=True)
+                        
+                        # Download design
+                        csv = design.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Design as CSV",
+                            data=csv,
+                            file_name=f"qd_doe_{qd_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+                        
+                        # Visualize design space
+                        if len(factors) >= 2:
+                            fig = px.scatter_matrix(
+                                design[list(factors.keys())],
+                                title=f"{design_type} Design Space"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Please select parameters with numeric data in the left panel")
     
     # ========================================================================
     # Tab 5: Reinforcement Learning - FIXED with type checking
