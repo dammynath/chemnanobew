@@ -1336,66 +1336,59 @@ def display_quantum_dots_tab(uploaded_file):
                 except:
                     st.metric(f"Mean {target}", "N/A")
     
-    # ========================================================================
-    # Tab 2: CIS-Te/ZnS Optimizer (SPECIALIZED TAB)
-    # ========================================================================
-    with qd_tabs[1]:
-        st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
+# ========================================================================
+# FIXED: Tab 2: CIS-Te/ZnS Optimizer with proper indentation
+# ========================================================================
+with qd_tabs[1]:
+    st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
+    
+    st.markdown("""
+    <div class='info-box'>
+    Specialized optimizer for Tellurium-alloyed CIS/ZnS quantum dots with enhanced NIR absorption.
+    Optimize synthesis parameters for maximum wavelength and intensity.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Parameter Ranges")
         
-        st.markdown("""
-        <div class='info-box'>
-        Specialized optimizer for Tellurium-alloyed CIS/ZnS quantum dots with enhanced NIR absorption.
-        Optimize synthesis parameters for maximum wavelength and intensity.
-        </div>
-        """, unsafe_allow_html=True)
+        # CIS-Te/ZnS specific parameters with proper tuple handling
+        cu_in_ratio = st.slider("Cu:In Ratio", 0.3, 2.0, (0.8, 1.2), key="cite_cu_in")
+        te_content = st.slider("Te Content (mol%)", 0.0, 15.0, (3.0, 8.0), key="cite_te", 
+                              help="Tellurium doping percentage")
+        temperature = st.slider("Temperature (°C)", 150, 280, (180, 240), key="cite_temp")
+        time_val = st.slider("Reaction Time (min)", 30, 240, (60, 150), key="cite_time")
+        zn_precursor = st.slider("Zn Precursor (M)", 0.1, 1.0, (0.2, 0.6), key="cite_zn")
+        ph_val = st.slider("pH", 4.0, 10.0, (5.5, 7.5), key="cite_ph")
         
-        col1, col2 = st.columns(2)
+        ranges = {
+            "cu_in_ratio": cu_in_ratio,
+            "te_content": te_content,
+            "temperature": temperature,
+            "time": time_val,
+            "zn_precursor": zn_precursor,
+            "ph": ph_val
+        }
         
-        with col1:
-            st.markdown("#### Parameter Ranges")
-            
-            # CIS-Te/ZnS specific parameters
-            cu_in_ratio = st.slider("Cu:In Ratio", 0.3, 2.0, (0.8, 1.2), key="cite_cu_in")
-            te_content = st.slider("Te Content (mol%)", 0.0, 15.0, (3.0, 8.0), key="cite_te", 
-                                  help="Tellurium doping percentage")
-            temperature = st.slider("Temperature (°C)", 150, 280, (180, 240), key="cite_temp")
-            time = st.slider("Reaction Time (min)", 30, 240, (60, 150), key="cite_time")
-            zn_precursor = st.slider("Zn Precursor (M)", 0.1, 1.0, (0.2, 0.6), key="cite_zn")
-            ph = st.slider("pH", 4.0, 10.0, (5.5, 7.5), key="cite_ph")
-            
-            ranges = {
-                "cu_in_ratio": cu_in_ratio,
-                "te_content": te_content,
-                "temperature": temperature,
-                "time": time,
-                "zn_precursor": zn_precursor,
-                "ph": ph
-            }
-            
-            # Surfactant selection
-            surfactant = st.selectbox(
-                "Surfactant",
-                ["oleic_acid", "oleylamine", "dodecanethiol", "TOP", "mixed"],
-                key="cite_surfactant"
-            )
+        # Surfactant selection
+        surfactant = st.selectbox(
+            "Surfactant",
+            ["oleic_acid", "oleylamine", "dodecanethiol", "TOP", "mixed"],
+            key="cite_surfactant"
+        )
+    
+    with col2:
+        st.markdown("#### Optimization Targets")
         
-        with col2:
-            st.markdown("#### Optimization Targets")
-            
-            target_absorption = st.number_input("Target Absorption (nm)", 700, 1000, 800, key="cite_target_abs")
-            target_plqy = st.number_input("Target PLQY (%)", 30, 90, 60, key="cite_target_plqy")
-            target_intensity = st.number_input("Target Intensity (a.u.)", 1000, 10000, 5000, key="cite_target_int")
-            
-            st.markdown("#### Current Best Values")
-            if 'absorption_nm' in data.columns:
-                st.metric("Best Absorption", f"{data['absorption_nm'].max():.1f} nm")
-            if 'plqy_percent' in data.columns:
-                st.metric("Best PLQY", f"{data['plqy_percent'].max():.1f}%")
-            if 'intensity' in data.columns:
-                st.metric("Best Intensity", f"{data['intensity'].max():.0f}")
+        target_absorption = st.number_input("Target Absorption (nm)", 700, 1000, 800, key="cite_target_abs")
+        target_plqy = st.number_input("Target PLQY (%)", 30, 90, 60, key="cite_target_plqy")
+        target_intensity = st.number_input("Target Intensity (a.u.)", 1000, 10000, 5000, key="cite_target_int")
         
-        # Upload specific CIS-Te/ZnS data
-numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        st.markdown("#### Current Best Values")
+        # Get numeric columns only
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
         
         if 'absorption_nm' in numeric_cols:
             st.metric("Best Absorption", f"{data['absorption_nm'].max():.1f} nm")
@@ -1565,8 +1558,9 @@ numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
                 # Generate grid of points
                 n_grid = 10  # Reduced for performance
                 grid_points = []
-                for param, (low, high) in zip(available_features, 
-                                             [cu_in_ratio, te_content, temperature, time_val, zn_precursor, ph][:len(available_features)]):
+                ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, ph]
+                for i, param in enumerate(available_features):
+                    low, high = ranges_list[i]
                     grid_points.append(np.linspace(low, high, n_grid))
                 
                 mesh = np.meshgrid(*grid_points)
