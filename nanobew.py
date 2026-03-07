@@ -1827,433 +1827,433 @@ def display_quantum_dots_tab(uploaded_file):
                     st.plotly_chart(fig, use_container_width=True)
     
     # ========================================================================
-    # Tab 5: Reinforcement Learning
+    # Tab 5: Reinforcement Learning - FIXED with type checking
     # ========================================================================
     with qd_tabs[4]:
-    st.markdown("### 🤖 Reinforcement Learning for Adaptive Experimentation")
-    
-    st.markdown("""
-    <div class='info-box'>
-    Use Reinforcement Learning to adaptively suggest the next best experiment based on previous results.
-    The agent learns which parameter combinations lead to optimal properties.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    # Get numeric columns for target selection
-    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-    
-    with col1:
-        st.markdown("#### RL Settings")
+        st.markdown("### 🤖 Reinforcement Learning for Adaptive Experimentation")
         
-        if len(numeric_cols) > 0:
-            target_property = st.selectbox(
-                "Target Property to Optimize",
-                numeric_cols,
-                key="rl_target"
-            )
-        else:
-            st.warning("No numeric columns available")
-            target_property = None
+        st.markdown("""
+        <div class='info-box'>
+        Use Reinforcement Learning to adaptively suggest the next best experiment based on previous results.
+        The agent learns which parameter combinations lead to optimal properties.
+        </div>
+        """, unsafe_allow_html=True)
         
-        exploration_rate = st.slider("Exploration Rate (ε)", 0.0, 1.0, 0.2, key="rl_epsilon")
-        n_suggestions = st.number_input("Number of Suggestions", 1, 20, 5, key="rl_n")
+        col1, col2 = st.columns(2)
         
-        use_deep_rl = st.checkbox("Use Deep RL (PyTorch)", value=TORCH_AVAILABLE, key="rl_deep")
-        if use_deep_rl and not TORCH_AVAILABLE:
-            st.warning("PyTorch not available. Using simplified RL.")
-    
-    with col2:
-        st.markdown("#### Current State")
-        st.metric("Total Experiments", len(data))
+        # Get numeric columns for target selection
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
         
-        if target_property and target_property in data.columns:
-            if pd.api.types.is_numeric_dtype(data[target_property]):
-                st.metric(f"Best {target_property}", f"{data[target_property].max():.2f}")
-                st.metric(f"Mean {target_property}", f"{data[target_property].mean():.2f}")
-            else:
-                st.metric(f"Best {target_property}", str(data[target_property].max()))
-                st.metric(f"Mean {target_property}", "N/A for categorical")
-    
-    if target_property and st.button("🎯 Suggest Next Experiments", use_container_width=True):
-        with st.spinner("RL agent exploring parameter space..."):
-            # Define factor ranges from numeric columns only
-            factor_ranges = {}
-            if qd_type == "CIS-Te/ZnS":
-                param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
-            else:
-                param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
+        with col1:
+            st.markdown("#### RL Settings")
             
-            for param in param_list:
-                if param in data.columns and pd.api.types.is_numeric_dtype(data[param]):
-                    factor_ranges[param] = (data[param].min(), data[param].max())
-            
-            if len(factor_ranges) == 0:
-                st.error("No numeric parameters found for RL optimization")
-            else:
-                # Initialize RL agent
-                state_size = len(factor_ranges)
-                action_size = 10  # Simplified - discretized actions
-                
-                if use_deep_rl and TORCH_AVAILABLE:
-                    rl_agent = QDReinforcementLearning(state_size, action_size)
-                else:
-                    rl_agent = None
-                
-                # Generate suggestions
-                suggestions = []
-                for _ in range(n_suggestions):
-                    if rl_agent:
-                        suggestion = rl_agent.suggest_experiment(data, factor_ranges, target_property)
-                    else:
-                        # Simple random perturbation
-                        if pd.api.types.is_numeric_dtype(data[target_property]):
-                            best_idx = data[target_property].idxmax()
-                        else:
-                            # For categorical, just take first row
-                            best_idx = 0
-                        
-                        best_params = {}
-                        for param in factor_ranges.keys():
-                            if param in data.columns:
-                                best_params[param] = data.loc[best_idx, param]
-                        
-                        suggestion = {}
-                        for param, (low, high) in factor_ranges.items():
-                            # Add exploration noise
-                            noise = np.random.normal(0, (high - low) * exploration_rate)
-                            value = best_params.get(param, (low + high)/2) + noise
-                            suggestion[param] = np.clip(value, low, high)
-                    
-                    suggestions.append(suggestion)
-                
-                # Display suggestions
-                suggestion_df = pd.DataFrame(suggestions)
-                st.success(f"✅ Generated {len(suggestion_df)} experiment suggestions")
-                st.dataframe(suggestion_df, use_container_width=True)
-                
-                # Download suggestions
-                csv = suggestion_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Suggestions",
-                    data=csv,
-                    file_name=f"rl_suggestions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
+            if len(numeric_cols) > 0:
+                target_property = st.selectbox(
+                    "Target Property to Optimize",
+                    numeric_cols,
+                    key="rl_target"
                 )
+            else:
+                st.warning("No numeric columns available")
+                target_property = None
+            
+            exploration_rate = st.slider("Exploration Rate (ε)", 0.0, 1.0, 0.2, key="rl_epsilon")
+            n_suggestions = st.number_input("Number of Suggestions", 1, 20, 5, key="rl_n")
+            
+            use_deep_rl = st.checkbox("Use Deep RL (PyTorch)", value=TORCH_AVAILABLE, key="rl_deep")
+            if use_deep_rl and not TORCH_AVAILABLE:
+                st.warning("PyTorch not available. Using simplified RL.")
+        
+        with col2:
+            st.markdown("#### Current State")
+            st.metric("Total Experiments", len(data))
+            
+            if target_property and target_property in data.columns:
+                if pd.api.types.is_numeric_dtype(data[target_property]):
+                    st.metric(f"Best {target_property}", f"{data[target_property].max():.2f}")
+                    st.metric(f"Mean {target_property}", f"{data[target_property].mean():.2f}")
+                else:
+                    st.metric(f"Best {target_property}", str(data[target_property].max()))
+                    st.metric(f"Mean {target_property}", "N/A for categorical")
+        
+        if target_property and st.button("🎯 Suggest Next Experiments", use_container_width=True):
+            with st.spinner("RL agent exploring parameter space..."):
+                # Define factor ranges from numeric columns only
+                factor_ranges = {}
+                if qd_type == "CIS-Te/ZnS":
+                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                else:
+                    param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
-                # Visualize suggestions vs history
-                if len(factor_ranges) >= 2:
-                    keys = list(factor_ranges.keys())
-                    fig = go.Figure()
+                for param in param_list:
+                    if param in data.columns and pd.api.types.is_numeric_dtype(data[param]):
+                        factor_ranges[param] = (data[param].min(), data[param].max())
+                
+                if len(factor_ranges) == 0:
+                    st.error("No numeric parameters found for RL optimization")
+                else:
+                    # Initialize RL agent
+                    state_size = len(factor_ranges)
+                    action_size = 10  # Simplified - discretized actions
                     
-                    # Historical data
-                    fig.add_trace(go.Scatter(
-                        x=data[keys[0]],
-                        y=data[keys[1]],
-                        mode='markers',
-                        name='Historical',
-                        marker=dict(color='blue', size=8, opacity=0.5)
-                    ))
+                    if use_deep_rl and TORCH_AVAILABLE:
+                        rl_agent = QDReinforcementLearning(state_size, action_size)
+                    else:
+                        rl_agent = None
                     
-                    # Suggestions
-                    fig.add_trace(go.Scatter(
-                        x=suggestion_df[keys[0]],
-                        y=suggestion_df[keys[1]],
-                        mode='markers',
-                        name='RL Suggestions',
-                        marker=dict(color='red', size=12, symbol='star')
-                    ))
+                    # Generate suggestions
+                    suggestions = []
+                    for _ in range(n_suggestions):
+                        if rl_agent:
+                            suggestion = rl_agent.suggest_experiment(data, factor_ranges, target_property)
+                        else:
+                            # Simple random perturbation
+                            if pd.api.types.is_numeric_dtype(data[target_property]):
+                                best_idx = data[target_property].idxmax()
+                            else:
+                                # For categorical, just take first row
+                                best_idx = 0
+                            
+                            best_params = {}
+                            for param in factor_ranges.keys():
+                                if param in data.columns:
+                                    best_params[param] = data.loc[best_idx, param]
+                            
+                            suggestion = {}
+                            for param, (low, high) in factor_ranges.items():
+                                # Add exploration noise
+                                noise = np.random.normal(0, (high - low) * exploration_rate)
+                                value = best_params.get(param, (low + high)/2) + noise
+                                suggestion[param] = np.clip(value, low, high)
+                        
+                        suggestions.append(suggestion)
                     
-                    fig.update_layout(
-                        title="RL Suggestions vs Historical Data",
-                        xaxis_title=keys[0].replace('_', ' ').title(),
-                        yaxis_title=keys[1].replace('_', ' ').title()
+                    # Display suggestions
+                    suggestion_df = pd.DataFrame(suggestions)
+                    st.success(f"✅ Generated {len(suggestion_df)} experiment suggestions")
+                    st.dataframe(suggestion_df, use_container_width=True)
+                    
+                    # Download suggestions
+                    csv = suggestion_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download Suggestions",
+                        data=csv,
+                        file_name=f"rl_suggestions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    # Visualize suggestions vs history
+                    if len(factor_ranges) >= 2:
+                        keys = list(factor_ranges.keys())
+                        fig = go.Figure()
+                        
+                        # Historical data
+                        fig.add_trace(go.Scatter(
+                            x=data[keys[0]],
+                            y=data[keys[1]],
+                            mode='markers',
+                            name='Historical',
+                            marker=dict(color='blue', size=8, opacity=0.5)
+                        ))
+                        
+                        # Suggestions
+                        fig.add_trace(go.Scatter(
+                            x=suggestion_df[keys[0]],
+                            y=suggestion_df[keys[1]],
+                            mode='markers',
+                            name='RL Suggestions',
+                            marker=dict(color='red', size=12, symbol='star')
+                        ))
+                        
+                        fig.update_layout(
+                            title="RL Suggestions vs Historical Data",
+                            xaxis_title=keys[0].replace('_', ' ').title(),
+                            yaxis_title=keys[1].replace('_', ' ').title()
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
     
     # ========================================================================
-    # Tab 6: Supervised Learning
+    # Tab 6: Supervised Learning - FIXED with type checking
     # ========================================================================
     with qd_tabs[5]:
-    st.markdown("### 📈 Supervised Learning for Property Prediction")
-    
-    st.markdown("""
-    <div class='info-box'>
-    Train various supervised learning models to predict QD properties from synthesis parameters.
-    Compare model performance and optimize hyperparameters.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    # Get numeric columns for target selection
-    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-    
-    with col1:
-        if len(numeric_cols) > 0:
-            target_var = st.selectbox(
-                "Target Variable to Predict",
-                numeric_cols,
-                key="sl_target"
-            )
-        else:
-            st.warning("No numeric columns available for prediction")
-            target_var = None
+        st.markdown("### 📈 Supervised Learning for Property Prediction")
         
-        if qd_type == "CIS-Te/ZnS":
-            default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time']
-        else:
-            default_features = [c for c in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
-                              if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:3]
+        st.markdown("""
+        <div class='info-box'>
+        Train various supervised learning models to predict QD properties from synthesis parameters.
+        Compare model performance and optimize hyperparameters.
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Filter feature variables to only include columns that exist and are numeric
-        available_features = [c for c in data.columns if c != target_var and pd.api.types.is_numeric_dtype(data[c])]
+        col1, col2 = st.columns(2)
         
-        feature_vars = st.multiselect(
-            "Feature Variables",
-            available_features,
-            default=[f for f in default_features if f in available_features][:3],
-            key="sl_features"
-        )
+        # Get numeric columns for target selection
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
         
-        test_size = st.slider("Test Set Size", 0.1, 0.4, 0.2, key="sl_test")
-        
-        model_types = st.multiselect(
-            "Model Types",
-            ["Linear Regression", "Ridge Regression", "Lasso Regression", 
-             "Decision Tree", "Random Forest", "Gradient Boosting", "SVR", "Neural Network"],
-            default=["Random Forest", "Gradient Boosting"],
-            key="sl_models"
-        )
-    
-    with col2:
-        if feature_vars and target_var:
-            st.markdown("#### Data Summary")
-            st.metric("Samples", len(data))
-            st.metric("Features", len(feature_vars))
-            
-            # Show correlation with target
-            correlations = []
-            for feat in feature_vars:
-                if feat in data.columns and target_var in data.columns:
-                    try:
-                        corr = data[feat].corr(data[target_var])
-                        correlations.append(f"{feat}: {corr:.3f}")
-                    except:
-                        pass
-            
-            if correlations:
-                st.markdown("**Correlations with Target:**")
-                for corr in correlations[:5]:
-                    st.text(corr)
-    
-    if feature_vars and target_var and st.button("🚀 Train Models", use_container_width=True):
-        with st.spinner("Training supervised learning models..."):
-            # Prepare data
-            sl = QDSupervisedLearning()
-            
-            # Handle categorical features (if any)
-            categorical = [c for c in feature_vars if data[c].dtype == 'object']
-            
-            # Prepare feature matrix
-            X = data[feature_vars].copy()
-            y = data[target_var].copy()
-            
-            # Ensure all data is numeric
-            for col in X.columns:
-                if not pd.api.types.is_numeric_dtype(X[col]):
-                    # Convert categorical to numeric if possible
-                    try:
-                        X[col] = pd.to_numeric(X[col], errors='coerce')
-                    except:
-                        # If can't convert, drop the column
-                        X = X.drop(columns=[col])
-                        if col in feature_vars:
-                            feature_vars.remove(col)
-            
-            # Drop any rows with NaN
-            valid_idx = ~(X.isna().any(axis=1) | y.isna())
-            X = X[valid_idx]
-            y = y[valid_idx]
-            
-            if len(X) < 10:
-                st.error("Not enough valid data points after cleaning")
+        with col1:
+            if len(numeric_cols) > 0:
+                target_var = st.selectbox(
+                    "Target Variable to Predict",
+                    numeric_cols,
+                    key="sl_target"
+                )
             else:
-                # Train models
-                model_dict = {}
-                for name in model_types:
-                    if name == "Linear Regression":
-                        model_dict[name] = LinearRegression()
-                    elif name == "Ridge Regression":
-                        model_dict[name] = Ridge(alpha=1.0)
-                    elif name == "Lasso Regression":
-                        model_dict[name] = Lasso(alpha=0.01)
-                    elif name == "Decision Tree":
-                        model_dict[name] = DecisionTreeRegressor(max_depth=5, random_state=42)
-                    elif name == "Random Forest":
-                        model_dict[name] = RandomForestRegressor(n_estimators=100, random_state=42)
-                    elif name == "Gradient Boosting":
-                        model_dict[name] = GradientBoostingRegressor(n_estimators=100, random_state=42)
-                    elif name == "SVR":
-                        model_dict[name] = SVR(kernel='rbf', C=100, gamma=0.1)
-                    elif name == "Neural Network":
-                        model_dict[name] = MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, random_state=42)
+                st.warning("No numeric columns available for prediction")
+                target_var = None
+            
+            if qd_type == "CIS-Te/ZnS":
+                default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time']
+            else:
+                default_features = [c for c in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
+                                  if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:3]
+            
+            # Filter feature variables to only include columns that exist and are numeric
+            available_features = [c for c in data.columns if c != target_var and pd.api.types.is_numeric_dtype(data[c])]
+            
+            feature_vars = st.multiselect(
+                "Feature Variables",
+                available_features,
+                default=[f for f in default_features if f in available_features][:3],
+                key="sl_features"
+            )
+            
+            test_size = st.slider("Test Set Size", 0.1, 0.4, 0.2, key="sl_test")
+            
+            model_types = st.multiselect(
+                "Model Types",
+                ["Linear Regression", "Ridge Regression", "Lasso Regression", 
+                 "Decision Tree", "Random Forest", "Gradient Boosting", "SVR", "Neural Network"],
+                default=["Random Forest", "Gradient Boosting"],
+                key="sl_models"
+            )
+        
+        with col2:
+            if feature_vars and target_var:
+                st.markdown("#### Data Summary")
+                st.metric("Samples", len(data))
+                st.metric("Features", len(feature_vars))
                 
-                # Split data
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+                # Show correlation with target
+                correlations = []
+                for feat in feature_vars:
+                    if feat in data.columns and target_var in data.columns:
+                        try:
+                            corr = data[feat].corr(data[target_var])
+                            correlations.append(f"{feat}: {corr:.3f}")
+                        except:
+                            pass
                 
-                # Scale features
-                scaler = StandardScaler()
-                X_train_scaled = scaler.fit_transform(X_train)
-                X_test_scaled = scaler.transform(X_test)
+                if correlations:
+                    st.markdown("**Correlations with Target:**")
+                    for corr in correlations[:5]:
+                        st.text(corr)
+        
+        if feature_vars and target_var and st.button("🚀 Train Models", use_container_width=True):
+            with st.spinner("Training supervised learning models..."):
+                # Prepare data
+                sl = QDSupervisedLearning()
                 
-                results = {}
-                for name, model in model_dict.items():
-                    try:
-                        model.fit(X_train_scaled, y_train)
-                        y_pred = model.predict(X_test_scaled)
-                        
-                        r2 = r2_score(y_test, y_pred)
-                        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                        mae = mean_absolute_error(y_test, y_pred)
-                        
-                        # Cross-validation
-                        cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='r2')
-                        
-                        results[name] = {
-                            'model': model,
-                            'r2': r2,
-                            'rmse': rmse,
-                            'mae': mae,
-                            'cv_mean': cv_scores.mean(),
-                            'cv_std': cv_scores.std()
-                        }
-                        
-                        # Store feature importance if available
-                        if hasattr(model, 'feature_importances_'):
-                            results[name]['feature_importance'] = model.feature_importances_
-                        elif hasattr(model, 'coef_'):
-                            results[name]['feature_importance'] = np.abs(model.coef_)
+                # Handle categorical features (if any)
+                categorical = [c for c in feature_vars if data[c].dtype == 'object']
+                
+                # Prepare feature matrix
+                X = data[feature_vars].copy()
+                y = data[target_var].copy()
+                
+                # Ensure all data is numeric
+                for col in X.columns:
+                    if not pd.api.types.is_numeric_dtype(X[col]):
+                        # Convert categorical to numeric if possible
+                        try:
+                            X[col] = pd.to_numeric(X[col], errors='coerce')
+                        except:
+                            # If can't convert, drop the column
+                            X = X.drop(columns=[col])
+                            if col in feature_vars:
+                                feature_vars.remove(col)
+                
+                # Drop any rows with NaN
+                valid_idx = ~(X.isna().any(axis=1) | y.isna())
+                X = X[valid_idx]
+                y = y[valid_idx]
+                
+                if len(X) < 10:
+                    st.error("Not enough valid data points after cleaning")
+                else:
+                    # Train models
+                    model_dict = {}
+                    for name in model_types:
+                        if name == "Linear Regression":
+                            model_dict[name] = LinearRegression()
+                        elif name == "Ridge Regression":
+                            model_dict[name] = Ridge(alpha=1.0)
+                        elif name == "Lasso Regression":
+                            model_dict[name] = Lasso(alpha=0.01)
+                        elif name == "Decision Tree":
+                            model_dict[name] = DecisionTreeRegressor(max_depth=5, random_state=42)
+                        elif name == "Random Forest":
+                            model_dict[name] = RandomForestRegressor(n_estimators=100, random_state=42)
+                        elif name == "Gradient Boosting":
+                            model_dict[name] = GradientBoostingRegressor(n_estimators=100, random_state=42)
+                        elif name == "SVR":
+                            model_dict[name] = SVR(kernel='rbf', C=100, gamma=0.1)
+                        elif name == "Neural Network":
+                            model_dict[name] = MLPRegressor(hidden_layer_sizes=(64, 32), max_iter=1000, random_state=42)
+                    
+                    # Split data
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+                    
+                    # Scale features
+                    scaler = StandardScaler()
+                    X_train_scaled = scaler.fit_transform(X_train)
+                    X_test_scaled = scaler.transform(X_test)
+                    
+                    results = {}
+                    for name, model in model_dict.items():
+                        try:
+                            model.fit(X_train_scaled, y_train)
+                            y_pred = model.predict(X_test_scaled)
                             
-                    except Exception as e:
-                        st.warning(f"Error training {name}: {str(e)}")
-                        continue
-                
-                if results:
-                    # Display results
-                    st.markdown("#### Model Performance Comparison")
+                            r2 = r2_score(y_test, y_pred)
+                            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                            mae = mean_absolute_error(y_test, y_pred)
+                            
+                            # Cross-validation
+                            cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=5, scoring='r2')
+                            
+                            results[name] = {
+                                'model': model,
+                                'r2': r2,
+                                'rmse': rmse,
+                                'mae': mae,
+                                'cv_mean': cv_scores.mean(),
+                                'cv_std': cv_scores.std()
+                            }
+                            
+                            # Store feature importance if available
+                            if hasattr(model, 'feature_importances_'):
+                                results[name]['feature_importance'] = model.feature_importances_
+                            elif hasattr(model, 'coef_'):
+                                results[name]['feature_importance'] = np.abs(model.coef_)
+                                
+                        except Exception as e:
+                            st.warning(f"Error training {name}: {str(e)}")
+                            continue
                     
-                    results_df = pd.DataFrame([
-                        {
-                            'Model': name,
-                            'R² Score': res['r2'],
-                            'RMSE': res['rmse'],
-                            'MAE': res['mae'],
-                            'CV Mean': res['cv_mean'],
-                            'CV Std': res['cv_std']
-                        }
-                        for name, res in results.items()
-                    ]).sort_values('R² Score', ascending=False)
-                    
-                    st.dataframe(results_df, use_container_width=True)
-                    
-                    # Plot comparison
-                    fig = go.Figure()
-                    fig.add_trace(go.Bar(
-                        x=results_df['Model'],
-                        y=results_df['R² Score'],
-                        name='R² Score',
-                        marker_color='lightblue'
-                    ))
-                    if results_df['RMSE'].max() > 0:
+                    if results:
+                        # Display results
+                        st.markdown("#### Model Performance Comparison")
+                        
+                        results_df = pd.DataFrame([
+                            {
+                                'Model': name,
+                                'R² Score': res['r2'],
+                                'RMSE': res['rmse'],
+                                'MAE': res['mae'],
+                                'CV Mean': res['cv_mean'],
+                                'CV Std': res['cv_std']
+                            }
+                            for name, res in results.items()
+                        ]).sort_values('R² Score', ascending=False)
+                        
+                        st.dataframe(results_df, use_container_width=True)
+                        
+                        # Plot comparison
+                        fig = go.Figure()
                         fig.add_trace(go.Bar(
                             x=results_df['Model'],
-                            y=results_df['RMSE'] / results_df['RMSE'].max(),
-                            name='Normalized RMSE',
-                            marker_color='lightcoral',
-                            opacity=0.7
+                            y=results_df['R² Score'],
+                            name='R² Score',
+                            marker_color='lightblue'
                         ))
-                    fig.update_layout(
-                        title="Model Performance Comparison",
-                        xaxis_title="Model",
-                        yaxis_title="Score",
-                        barmode='group',
-                        height=400
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Feature importance for best model
-                    best_model = results_df.iloc[0]['Model']
-                    if best_model in results and 'feature_importance' in results[best_model]:
-                        importance = results[best_model]['feature_importance']
-                        
-                        fig2 = go.Figure()
-                        fig2.add_trace(go.Bar(
-                            x=feature_vars,
-                            y=importance[:len(feature_vars)] if len(importance) >= len(feature_vars) else importance,
-                            name='Feature Importance',
-                            marker_color='green'
-                        ))
-                        fig2.update_layout(
-                            title=f"Feature Importance ({best_model})",
-                            xaxis_title="Feature",
-                            yaxis_title="Importance",
-                            height=300
+                        if results_df['RMSE'].max() > 0:
+                            fig.add_trace(go.Bar(
+                                x=results_df['Model'],
+                                y=results_df['RMSE'] / results_df['RMSE'].max(),
+                                name='Normalized RMSE',
+                                marker_color='lightcoral',
+                                opacity=0.7
+                            ))
+                        fig.update_layout(
+                            title="Model Performance Comparison",
+                            xaxis_title="Model",
+                            yaxis_title="Score",
+                            barmode='group',
+                            height=400
                         )
-                        st.plotly_chart(fig2, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Feature importance for best model
+                        best_model = results_df.iloc[0]['Model']
+                        if best_model in results and 'feature_importance' in results[best_model]:
+                            importance = results[best_model]['feature_importance']
+                            
+                            fig2 = go.Figure()
+                            fig2.add_trace(go.Bar(
+                                x=feature_vars,
+                                y=importance[:len(feature_vars)] if len(importance) >= len(feature_vars) else importance,
+                                name='Feature Importance',
+                                marker_color='green'
+                            ))
+                            fig2.update_layout(
+                                title=f"Feature Importance ({best_model})",
+                                xaxis_title="Feature",
+                                yaxis_title="Importance",
+                                height=300
+                            )
+                            st.plotly_chart(fig2, use_container_width=True)
 
     
     # ========================================================================
-    # Tab 7: Optimization
+    # Tab 7: Optimization - FIXED with type checking
     # ========================================================================
     with qd_tabs[6]:
-    st.markdown("### 🔧 Optimization Settings")
-    
-    # Get only numeric columns for target selection
-    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-    
-    if len(numeric_cols) == 0:
-        st.warning("No numeric columns available for optimization")
-    else:
-        target_property = st.selectbox(
-            "Target Property",
-            numeric_cols,
-            key="opt_target"
-        )
+        st.markdown("### 🔧 Optimization Settings")
         
-        optimization_method = st.selectbox(
-            "Optimization Method",
-            ["Bayesian Optimization", "Grid Search", "Random Search", "Genetic Algorithm"],
-            key="opt_method"
-        )
+        # Get only numeric columns for target selection
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
         
-        n_iterations = st.number_input("Number of Iterations", 5, 100, 20, key="opt_iter")
-        
-        if st.button("🚀 Run Optimization", use_container_width=True):
-            with st.spinner("Running optimization..."):
-                progress_bar = st.progress(0)
-                for i in range(n_iterations):
-                    time.sleep(0.05)
-                    progress_bar.progress((i + 1) / n_iterations)
-                
-                # Ensure we're working with numeric data
-                if pd.api.types.is_numeric_dtype(data[target_property]):
-                    best_value = data[target_property].max() * (1 + np.random.uniform(0.05, 0.15))
+        if len(numeric_cols) == 0:
+            st.warning("No numeric columns available for optimization")
+        else:
+            target_property = st.selectbox(
+                "Target Property",
+                numeric_cols,
+                key="opt_target"
+            )
+            
+            optimization_method = st.selectbox(
+                "Optimization Method",
+                ["Bayesian Optimization", "Grid Search", "Random Search", "Genetic Algorithm"],
+                key="opt_method"
+            )
+            
+            n_iterations = st.number_input("Number of Iterations", 5, 100, 20, key="opt_iter")
+            
+            if st.button("🚀 Run Optimization", use_container_width=True):
+                with st.spinner("Running optimization..."):
+                    progress_bar = st.progress(0)
+                    for i in range(n_iterations):
+                        time.sleep(0.05)
+                        progress_bar.progress((i + 1) / n_iterations)
                     
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Best Value", f"{best_value:.2f}")
-                    with col2:
-                        improvement = ((best_value/data[target_property].max())-1)*100
-                        st.metric("Improvement", f"+{improvement:.1f}%")
-                    with col3:
-                        st.metric("Confidence", f"{np.random.uniform(85, 95):.0f}%")
-                    with col4:
-                        st.metric("Iterations", n_iterations)
-                else:
-                    st.error(f"Selected property '{target_property}' is not numeric")
+                    # Ensure we're working with numeric data
+                    if pd.api.types.is_numeric_dtype(data[target_property]):
+                        best_value = data[target_property].max() * (1 + np.random.uniform(0.05, 0.15))
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Best Value", f"{best_value:.2f}")
+                        with col2:
+                            improvement = ((best_value/data[target_property].max())-1)*100
+                            st.metric("Improvement", f"+{improvement:.1f}%")
+                        with col3:
+                            st.metric("Confidence", f"{np.random.uniform(85, 95):.0f}%")
+                        with col4:
+                            st.metric("Iterations", n_iterations)
+                    else:
+                        st.error(f"Selected property '{target_property}' is not numeric")
     
     # ========================================================================
     # Tab 8: Export
