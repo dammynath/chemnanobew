@@ -1281,26 +1281,25 @@ def display_quantum_dots_tab(uploaded_file):
         "📥 Export"
     ])
     
-    # ========================================================================
-    # Tab 1: Data Explorer
-    # ========================================================================
-    with qd_tabs[0]:
-        col1, col2 = st.columns([2, 1])
+# ========================================================================
+# Tab 1: Data Explorer with proper indentation       
+# ========================================================================
+with qd_tabs[0]:
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("### Experimental Data")
+        st.dataframe(data.head(10), use_container_width=True)
         
-        with col1:
-            st.markdown("### Experimental Data")
-            st.dataframe(data.head(10), use_container_width=True)
-            
-            with st.expander("📊 Summary Statistics"):
-                st.dataframe(data.describe(), use_container_width=True)
+        with st.expander("📊 Summary Statistics"):
+            st.dataframe(data.describe(), use_container_width=True)
+    
+    with col2:
+        st.markdown("### Data Overview")
+        st.metric("Total Experiments", len(data))
+        st.metric("Features", len(data.columns))
         
-        with col2:
-            st.markdown("### Data Overview")
-            st.metric("Total Experiments", len(data))
-            st.metric("Features", len(data.columns))
-            
-            # Property targets
-            # Property targets - only show numeric columns
+        # Property targets - only show numeric columns
         st.markdown("### 🎯 Target Properties")
         numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
         
