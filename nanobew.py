@@ -1217,9 +1217,6 @@ class QDSupervisedLearning:
         return predictions
 
 # ============================================================================
-# TAB 1: Quantum Dots
-# ============================================================================
-# ============================================================================
 # UPDATED QUANTUM DOTS TAB WITH CIS-Te/ZnS OPTIMIZER
 # ============================================================================
 def display_quantum_dots_tab(uploaded_file):
@@ -1269,17 +1266,17 @@ def display_quantum_dots_tab(uploaded_file):
         st.error("No data available")
         return
     
-    # Create enhanced tabs with CIS-Te/ZnS Optimizer
-    qd_tabs = st.tabs([
-        "📊 Data Explorer",
-        "👨‍🔬 CIS-Te/ZnS Optimizer",
-        "🔮 Molecular & Optical Properties",
-        "📐 Design of Experiments",
-        "🤖 Reinforcement Learning",
-        "📈 Supervised Learning",
-        "🔬 Optimization",
-        "📥 Export"
-    ])
+# Create enhanced tabs with CIS-Te/ZnS Optimizer
+qd_tabs = st.tabs([
+    "📊 Data Explorer",
+    "👨‍🔬 CIS-Te/ZnS Optimizer",
+    "🔮 Molecular & Optical Properties",
+    "📐 Design of Experiments",
+    "🤖 Reinforcement Learning",
+    "📈 Supervised Learning",
+    "🔬 Optimization",
+    "📥 Export"
+])
     
 # ========================================================================
 # Tab 1: Data Explorer with proper indentation       
