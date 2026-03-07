@@ -2018,7 +2018,7 @@ def display_quantum_dots_tab(uploaded_file):
                         st.plotly_chart(fig, use_container_width=True)
     
     # ========================================================================
-    # Tab 6: Supervised Learning - FIXED with type checking
+    # Tab 6: Supervised Learning - FIXED with proper imports
     # ========================================================================
     with qd_tabs[5]:
         st.markdown("### 📈 Supervised Learning for Property Prediction")
@@ -2125,7 +2125,7 @@ def display_quantum_dots_tab(uploaded_file):
                 if len(X) < 10:
                     st.error("Not enough valid data points after cleaning")
                 else:
-                    # Train models
+                    # Train models - use imported classes directly
                     model_dict = {}
                     for name in model_types:
                         if name == "Linear Regression":
