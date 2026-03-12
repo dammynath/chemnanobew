@@ -2993,12 +2993,8 @@ def display_molecular_generator_tab():
 
 
 # ============================================================================
-# TAB 5: Advanced Visualization - UPDATED with Spectral Analysis
+# TAB 5: Advanced Visualization - COMPLETE OVERHAUL with all requested features
 # ============================================================================
-
-# ============================================================================
-# TAB 5: Advanced Visualization - UPDATED with Spectral Analysis
-# ============================================================================                
 
 def display_advanced_visualization(uploaded_file):
     """Advanced visualization tab with comprehensive spectral analysis"""
@@ -3062,7 +3058,7 @@ def display_advanced_visualization(uploaded_file):
     def smooth_spectrum(y, window_length=5, polyorder=2):
         """Smooth spectrum using Savitzky-Golay filter"""
         from scipy.signal import savgol_filter
-        if len(y) > window_length:
+        if len(y) > window_length and window_length % 2 == 1:
             return savgol_filter(y, window_length, polyorder)
         return y
     
@@ -3170,77 +3166,90 @@ def display_advanced_visualization(uploaded_file):
                     y_title = st.text_input("Y-axis Title", value="", key="y_title")
             
             # Dynamic plot configuration based on plot type
-            if plot_type in ["Scatter Plot", "Line Plot"]:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    x_axis = st.selectbox("X-axis", numeric_cols, index=0 if numeric_cols else None, key="viz_x")
-                with col2:
-                    y_axis = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1) if len(numeric_cols) > 1 else 0, key="viz_y")
-                with col3:
-                    color_by = st.selectbox("Color by", ['None'] + numeric_cols + categorical_cols, key="viz_color")
-            
-            elif plot_type == "Histogram":
-                hist_var = st.selectbox("Variable", numeric_cols, index=0, key="viz_hist")
-                n_bins = st.slider("Number of Bins", 5, 100, 30, key="viz_bins")
+            plot_config_placeholder = st.empty()
             
             # Generate Plot button
             if st.button("🎨 Generate Plot", use_container_width=True, type="primary"):
                 with st.spinner("Generating visualization..."):
                     
-                    if plot_type == "Scatter Plot" and x_axis and y_axis:
-                        if color_by == 'None':
-                            fig = px.scatter(data, x=x_axis, y=y_axis, 
-                                           title=f"{y_axis} vs {x_axis}",
-                                           template=chart_theme,
-                                           height=chart_height)
-                        else:
-                            fig = px.scatter(data, x=x_axis, y=y_axis, color=color_by,
-                                           title=f"{y_axis} vs {x_axis} (colored by {color_by})",
-                                           template=chart_theme,
-                                           height=chart_height)
+                    if plot_type in ["Scatter Plot", "Line Plot"]:
+                        with plot_config_placeholder.container():
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                x_axis = st.selectbox("X-axis", numeric_cols, index=0 if numeric_cols else None, key="viz_x")
+                            with col2:
+                                y_axis = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1) if len(numeric_cols) > 1 else 0, key="viz_y")
+                            with col3:
+                                color_by = st.selectbox("Color by", ['None'] + numeric_cols + categorical_cols, key="viz_color")
                         
-                        # Add trendline if requested
-                        if show_trendline:
-                            from sklearn.linear_model import LinearRegression
-                            X = data[x_axis].values.reshape(-1, 1)
-                            y = data[y_axis].values
-                            model = LinearRegression().fit(X, y)
-                            y_pred = model.predict(X)
+                        if x_axis and y_axis:
+                            if color_by == 'None':
+                                fig = px.scatter(data, x=x_axis, y=y_axis, 
+                                               title=f"{y_axis} vs {x_axis}",
+                                               template=chart_theme,
+                                               height=chart_height)
+                                if plot_type == "Line Plot":
+                                    fig = px.line(data, x=x_axis, y=y_axis,
+                                                title=f"{y_axis} vs {x_axis}",
+                                                template=chart_theme,
+                                                height=chart_height)
+                            else:
+                                fig = px.scatter(data, x=x_axis, y=y_axis, color=color_by,
+                                               title=f"{y_axis} vs {x_axis} (colored by {color_by})",
+                                               template=chart_theme,
+                                               height=chart_height)
+                                if plot_type == "Line Plot":
+                                    fig = px.line(data, x=x_axis, y=y_axis, color=color_by,
+                                                title=f"{y_axis} vs {x_axis} (colored by {color_by})",
+                                                template=chart_theme,
+                                                height=chart_height)
                             
-                            fig.add_trace(go.Scatter(
-                                x=data[x_axis],
-                                y=y_pred,
-                                mode='lines',
-                                name='Trendline',
-                                line=dict(color='red', width=2, dash='dash')
-                            ))
+                            # Add trendline if requested
+                            if show_trendline:
+                                from sklearn.linear_model import LinearRegression
+                                X = data[x_axis].values.reshape(-1, 1)
+                                y = data[y_axis].values
+                                model = LinearRegression().fit(X, y)
+                                y_pred = model.predict(X)
+                                
+                                fig.add_trace(go.Scatter(
+                                    x=data[x_axis],
+                                    y=y_pred,
+                                    mode='lines',
+                                    name='Trendline',
+                                    line=dict(color='red', width=2, dash='dash')
+                                ))
+                                
+                                if show_r2:
+                                    r2 = model.score(X, y)
+                                    fig.add_annotation(
+                                        x=data[x_axis].max(),
+                                        y=data[y_axis].max(),
+                                        text=f"R² = {r2:.4f}",
+                                        showarrow=False,
+                                        font=dict(size=14, color="red")
+                                    )
+                                
+                                if show_equation:
+                                    eq = f"y = {model.coef_[0]:.4f}x + {model.intercept_:.4f}"
+                                    fig.add_annotation(
+                                        x=data[x_axis].min(),
+                                        y=data[y_axis].max(),
+                                        text=eq,
+                                        showarrow=False,
+                                        font=dict(size=12)
+                                    )
                             
-                            if show_r2:
-                                r2 = model.score(X, y)
-                                fig.add_annotation(
-                                    x=data[x_axis].max(),
-                                    y=data[y_axis].max(),
-                                    text=f"R² = {r2:.4f}",
-                                    showarrow=False,
-                                    font=dict(size=14, color="red")
-                                )
-                            
-                            if show_equation:
-                                eq = f"y = {model.coef_[0]:.4f}x + {model.intercept_:.4f}"
-                                fig.add_annotation(
-                                    x=data[x_axis].min(),
-                                    y=data[y_axis].max(),
-                                    text=eq,
-                                    showarrow=False,
-                                    font=dict(size=12)
-                                )
-                        
-                        # Add error bars if requested
-                        if add_error_bars and color_by == 'None':
-                            y_std = data[y_axis].std()
-                            fig.update_traces(error_y=dict(type='constant', value=y_std, visible=True))
+                            # Add error bars if requested
+                            if add_error_bars and color_by == 'None':
+                                y_std = data[y_axis].std()
+                                fig.update_traces(error_y=dict(type='constant', value=y_std, visible=True))
                     
-                    elif plot_type == "Histogram" and hist_var:
+                    elif plot_type == "Histogram":
+                        with plot_config_placeholder.container():
+                            hist_var = st.selectbox("Variable", numeric_cols, index=0, key="viz_hist")
+                            n_bins = st.slider("Number of Bins", 5, 100, 30, key="viz_bins")
+                        
                         fig = px.histogram(data, x=hist_var, nbins=n_bins,
                                          title=f"Histogram of {hist_var}",
                                          template=chart_theme,
@@ -3273,8 +3282,7 @@ def display_advanced_visualization(uploaded_file):
                                 st.warning("Could not fit Gaussian curve")
                     
                     elif plot_type == "Heatmap" and numeric_cols:
-                        corr_matrix = data[numeric_cols].corr()
-                        fig = px.imshow(corr_matrix,
+                        fig = px.imshow(data[numeric_cols].corr(),
                                       text_auto=True,
                                       aspect="auto",
                                       color_continuous_scale='RdBu_r',
@@ -3323,17 +3331,37 @@ def display_advanced_visualization(uploaded_file):
                 if uv_file is not None:
                     uv_data, encoding = read_csv_with_encoding(uv_file)
                     if uv_data is not None:
+                        # Clean column names
                         uv_data.columns = uv_data.columns.str.lower().str.replace(' ', '_')
                         
-                        # Identify wavelength and absorbance columns
-                        wave_col = next((c for c in uv_data.columns if 'wave' in c or 'lambda' in c), uv_data.columns[0])
-                        abs_col = next((c for c in uv_data.columns if 'abs' in c or 'od' in c), uv_data.columns[1])
+                        # Try to identify wavelength and absorbance columns
+                        wave_col = None
+                        abs_col = None
                         
-                        uv_wavelength = uv_data[wave_col].values
-                        uv_absorbance = uv_data[abs_col].values
+                        for col in uv_data.columns:
+                            if any(x in col for x in ['wave', 'lambda', 'wl', 'nm']):
+                                wave_col = col
+                            if any(x in col for x in ['abs', 'od', 'intensity', 'a']):
+                                abs_col = col
+                        
+                        # If not found, use first two columns
+                        if wave_col is None:
+                            wave_col = uv_data.columns[0]
+                        if abs_col is None:
+                            abs_col = uv_data.columns[1] if len(uv_data.columns) > 1 else uv_data.columns[0]
+                        
+                        # Convert to numeric
+                        uv_wavelength = pd.to_numeric(uv_data[wave_col], errors='coerce').dropna().values
+                        uv_absorbance = pd.to_numeric(uv_data[abs_col], errors='coerce').dropna().values
+                        
+                        # Ensure same length
+                        min_len = min(len(uv_wavelength), len(uv_absorbance))
+                        uv_wavelength = uv_wavelength[:min_len]
+                        uv_absorbance = uv_absorbance[:min_len]
                         
                         st.session_state['uv_wavelength'] = uv_wavelength
                         st.session_state['uv_absorbance'] = uv_absorbance
+                        st.session_state['uv_has_data'] = True
                         st.success(f"✅ Loaded UV/Vis data with {len(uv_wavelength)} points (encoding: {encoding})")
                     else:
                         st.error("Could not read file. Please check the format.")
@@ -3357,193 +3385,175 @@ def display_advanced_visualization(uploaded_file):
                 
                 wavelength_range = st.slider("Wavelength Range (nm)", 200, 900, (300, 800), key="uv_range")
                 resolution = st.number_input("Resolution (points)", 100, 1000, 500, key="uv_res")
-                
-                if st.button("Generate UV/Vis Spectrum", use_container_width=True):
-                    uv_wavelength = np.linspace(wavelength_range[0], wavelength_range[1], resolution)
-                    uv_absorbance = np.zeros_like(uv_wavelength)
-                    
-                    for peak in uv_peaks:
-                        uv_absorbance += peak['height'] * np.exp(-((uv_wavelength - peak['center'])**2) / (2 * peak['width']**2))
-                    
-                    st.session_state['uv_wavelength'] = uv_wavelength
-                    st.session_state['uv_absorbance'] = uv_absorbance
-                    st.success("✅ Generated synthetic UV/Vis spectrum")
             
             # UV/Vis Processing Options
-            if 'uv_wavelength' in st.session_state:
-                with st.expander("🔧 Processing Options", expanded=True):
-                    st.markdown("#### 📊 Data Processing")
-                    
-                    # Normalization options
-                    norm_option = st.selectbox(
-                        "Normalization",
-                        ["None", "Normalize to 1", "Normalize to 100%", "Min-Max Normalize"],
-                        key="uv_norm"
-                    )
-                    
-                    # Smoothing
-                    smooth_uv = st.checkbox("Smooth Spectrum", value=False, key="smooth_uv")
-                    if smooth_uv:
-                        uv_smooth_window = st.slider("Smoothing Window", 3, 21, 5, step=2, key="uv_smooth_window")
-                    
-                    # Baseline correction
-                    baseline_uv = st.checkbox("Baseline Correct", value=False, key="baseline_uv")
-                    if baseline_uv:
-                        uv_baseline_points = st.multiselect(
-                            "Baseline Points (indices)",
-                            options=list(range(len(st.session_state['uv_wavelength'])))[::10],
-                            default=[0, -1],
-                            key="uv_baseline_points"
-                        )
-                    
-                    # Axis conversions
-                    st.markdown("#### 📐 Axis Conversion")
-                    uv_x_axis = st.selectbox(
-                        "X-axis",
-                        ["Wavelength (nm)", "Wavenumber (cm⁻¹)", "Energy (eV)"],
-                        key="uv_x_axis"
-                    )
-                    
-                    uv_y_axis = st.selectbox(
-                        "Y-axis",
-                        ["Absorbance", "Intensity", "% Transmittance", "% Reflectance"],
-                        key="uv_y_axis"
-                    )
-                    
-                    # Peak analysis
-                    st.markdown("#### 📈 Peak Analysis")
-                    find_peaks_uv = st.checkbox("Find and Label Peaks", value=True, key="find_peaks_uv")
-                    calculate_fwhm_uv = st.checkbox("Calculate FWHM", value=True, key="fwhm_uv")
-                    peak_prominence = st.slider("Peak Prominence", 0.01, 0.5, 0.05, key="uv_prominence")
-                    
-                    # Overlay/Stack
-                    st.markdown("#### 🔄 Display Options")
-                    uv_display_mode = st.radio(
-                        "Display Mode",
-                        ["Single", "Overlay", "Stack"],
-                        key="uv_display"
-                    )
-        
-        with col2:
-            st.markdown("#### 📈 Spectrum Visualization")
+            uv_processing_expander = st.expander("🔧 Processing Options", expanded=True)
             
-            if 'uv_wavelength' in st.session_state and 'uv_absorbance' in st.session_state:
-                # Get data
-                x = st.session_state['uv_wavelength'].copy()
-                y = st.session_state['uv_absorbance'].copy()
-                
-                # Apply baseline correction
-                if baseline_uv and uv_baseline_points:
-                    baseline_x = x[uv_baseline_points]
-                    baseline_y = y[uv_baseline_points]
-                    from scipy import interpolate
-                    f = interpolate.interp1d(baseline_x, baseline_y, kind='linear', fill_value='extrapolate')
-                    baseline = f(x)
-                    y = y - baseline
-                    y = np.maximum(y, 0)  # Ensure non-negative
-                
-                # Apply smoothing
-                if smooth_uv:
-                    y = smooth_spectrum(y, uv_smooth_window)
-                
-                # Apply normalization
-                if norm_option == "Normalize to 1":
-                    y = y / np.max(y)
-                elif norm_option == "Normalize to 100%":
-                    y = y / np.max(y) * 100
-                elif norm_option == "Min-Max Normalize":
-                    y = (y - np.min(y)) / (np.max(y) - np.min(y))
-                
-                # Convert x-axis if needed
-                x_label = "Wavelength (nm)"
-                if uv_x_axis == "Wavenumber (cm⁻¹)":
-                    x = convert_wavelength_to_wavenumber(x)
-                    x_label = "Wavenumber (cm⁻¹)"
-                elif uv_x_axis == "Energy (eV)":
-                    x = convert_wavelength_to_ev(x)
-                    x_label = "Energy (eV)"
-                
-                # Convert y-axis if needed
-                y_label = uv_y_axis
-                if uv_y_axis == "% Transmittance":
-                    y = 100 * np.exp(-y)
-                elif uv_y_axis == "% Reflectance":
-                    y = 100 * (1 - np.exp(-y))
-                
-                # Create figure
-                fig_uv = go.Figure()
-                
-                fig_uv.add_trace(go.Scatter(
-                    x=x,
-                    y=y,
-                    mode='lines',
-                    name='UV/Vis Spectrum',
-                    line=dict(color='blue', width=2)
-                ))
-                
-                # Find and label peaks
-                if find_peaks_uv:
-                    from scipy.signal import find_peaks
-                    peaks, properties = find_peaks(y, height=peak_prominence, distance=10)
+            # Generate Plot button
+            if st.button("🎨 Generate UV/Vis Plot", use_container_width=True, type="primary"):
+                with st.spinner("Generating UV/Vis spectrum..."):
                     
-                    if len(peaks) > 0:
-                        fig_uv.add_trace(go.Scatter(
-                            x=x[peaks],
-                            y=y[peaks],
-                            mode='markers',
-                            name='Peaks',
-                            marker=dict(color='red', size=10, symbol='star')
-                        ))
+                    # Generate or process data
+                    if uv_source == "Generate Synthetic Spectrum":
+                        uv_wavelength = np.linspace(wavelength_range[0], wavelength_range[1], resolution)
+                        uv_absorbance = np.zeros_like(uv_wavelength)
                         
-                        for i, peak_idx in enumerate(peaks):
-                            fig_uv.add_annotation(
-                                x=x[peak_idx],
-                                y=y[peak_idx],
-                                text=f"{x[peak_idx]:.1f}",
-                                showarrow=True,
-                                arrowhead=2,
-                                ax=0,
-                                ay=-40
+                        for peak in uv_peaks:
+                            uv_absorbance += peak['height'] * np.exp(-((uv_wavelength - peak['center'])**2) / (2 * peak['width']**2))
+                        
+                        st.session_state['uv_wavelength'] = uv_wavelength
+                        st.session_state['uv_absorbance'] = uv_absorbance
+                        st.session_state['uv_has_data'] = True
+                    
+                    # Check if we have data
+                    if 'uv_has_data' not in st.session_state or not st.session_state['uv_has_data']:
+                        st.warning("Please generate or upload data first")
+                    else:
+                        # Get data
+                        x = st.session_state['uv_wavelength'].copy()
+                        y = st.session_state['uv_absorbance'].copy()
+                        
+                        with uv_processing_expander:
+                            st.markdown("#### 📊 Data Processing")
+                            
+                            # Normalization options
+                            norm_option = st.selectbox(
+                                "Normalization",
+                                ["None", "Normalize to 1", "Normalize to 100%", "Min-Max Normalize"],
+                                key="uv_norm"
                             )
                             
-                            if calculate_fwhm_uv:
-                                fwhm = calculate_fwhm(x, y)
-                                if fwhm:
-                                    st.metric(f"Peak {i+1} FWHM", f"{fwhm:.1f} {x_label.split()[0]}")
-                
-                fig_uv.update_layout(
-                    title="UV/Vis Absorption Spectrum",
-                    xaxis_title=x_label,
-                    yaxis_title=y_label,
-                    height=500,
-                    template="plotly_white"
-                )
-                
-                st.plotly_chart(fig_uv, use_container_width=True)
-                
-                # Generate Plot button
-                if st.button("🎨 Generate UV/Vis Plot", use_container_width=True):
-                    st.success("Plot generated successfully!")
-                
-                # Download spectrum data
-                uv_df = pd.DataFrame({
-                    'x_values': x,
-                    'y_values': y,
-                    'x_unit': x_label,
-                    'y_unit': y_label
-                })
-                csv = uv_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Spectrum Data",
-                    data=csv,
-                    file_name="uv_vis_spectrum.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("👆 Generate or upload UV/Vis data to display spectrum")
+                            # Smoothing
+                            smooth_uv = st.checkbox("Smooth Spectrum", value=False, key="smooth_uv")
+                            if smooth_uv:
+                                uv_smooth_window = st.slider("Smoothing Window", 3, 21, 5, step=2, key="uv_smooth_window")
+                                y = smooth_spectrum(y, uv_smooth_window)
+                            
+                            # Baseline correction
+                            baseline_uv = st.checkbox("Baseline Correct", value=False, key="baseline_uv")
+                            if baseline_uv:
+                                y = y - np.min(y)
+                            
+                            # Apply normalization
+                            if norm_option == "Normalize to 1":
+                                y = y / np.max(y) if np.max(y) > 0 else y
+                            elif norm_option == "Normalize to 100%":
+                                y = y / np.max(y) * 100 if np.max(y) > 0 else y
+                            elif norm_option == "Min-Max Normalize":
+                                y = (y - np.min(y)) / (np.max(y) - np.min(y)) if (np.max(y) - np.min(y)) > 0 else y
+                            
+                            # Axis conversions
+                            st.markdown("#### 📐 Axis Conversion")
+                            uv_x_axis = st.selectbox(
+                                "X-axis",
+                                ["Wavelength (nm)", "Wavenumber (cm⁻¹)", "Energy (eV)"],
+                                key="uv_x_axis"
+                            )
+                            
+                            uv_y_axis = st.selectbox(
+                                "Y-axis",
+                                ["Absorbance", "Intensity", "% Transmittance", "% Reflectance"],
+                                key="uv_y_axis"
+                            )
+                            
+                            # Peak analysis
+                            st.markdown("#### 📈 Peak Analysis")
+                            find_peaks_uv = st.checkbox("Find and Label Peaks", value=True, key="find_peaks_uv")
+                            calculate_fwhm_uv = st.checkbox("Calculate FWHM", value=True, key="fwhm_uv")
+                            peak_prominence = st.slider("Peak Prominence", 0.01, 0.5, 0.05, key="uv_prominence")
+                            
+                            # Overlay/Stack
+                            st.markdown("#### 🔄 Display Options")
+                            uv_display_mode = st.radio(
+                                "Display Mode",
+                                ["Single", "Overlay", "Stack"],
+                                key="uv_display"
+                            )
+                        
+                        # Convert x-axis if needed
+                        x_label = "Wavelength (nm)"
+                        if uv_x_axis == "Wavenumber (cm⁻¹)":
+                            x = convert_wavelength_to_wavenumber(x)
+                            x_label = "Wavenumber (cm⁻¹)"
+                        elif uv_x_axis == "Energy (eV)":
+                            x = convert_wavelength_to_ev(x)
+                            x_label = "Energy (eV)"
+                        
+                        # Convert y-axis if needed
+                        y_label = uv_y_axis
+                        if uv_y_axis == "% Transmittance":
+                            y = 100 * np.exp(-y)
+                        elif uv_y_axis == "% Reflectance":
+                            y = 100 * (1 - np.exp(-y))
+                        
+                        # Create figure
+                        fig_uv = go.Figure()
+                        
+                        fig_uv.add_trace(go.Scatter(
+                            x=x,
+                            y=y,
+                            mode='lines',
+                            name='UV/Vis Spectrum',
+                            line=dict(color='blue', width=2)
+                        ))
+                        
+                        # Find and label peaks
+                        if find_peaks_uv:
+                            from scipy.signal import find_peaks
+                            peaks, properties = find_peaks(y, height=peak_prominence * np.max(y), distance=10)
+                            
+                            if len(peaks) > 0:
+                                fig_uv.add_trace(go.Scatter(
+                                    x=x[peaks],
+                                    y=y[peaks],
+                                    mode='markers',
+                                    name='Peaks',
+                                    marker=dict(color='red', size=10, symbol='star')
+                                ))
+                                
+                                for i, peak_idx in enumerate(peaks):
+                                    fig_uv.add_annotation(
+                                        x=x[peak_idx],
+                                        y=y[peak_idx],
+                                        text=f"{x[peak_idx]:.1f}",
+                                        showarrow=True,
+                                        arrowhead=2,
+                                        ax=0,
+                                        ay=-40
+                                    )
+                                    
+                                    if calculate_fwhm_uv and i == 0:
+                                        fwhm = calculate_fwhm(x, y)
+                                        if fwhm:
+                                            st.metric(f"FWHM", f"{fwhm:.1f} {x_label.split()[0]}")
+                        
+                        fig_uv.update_layout(
+                            title="UV/Vis Absorption Spectrum",
+                            xaxis_title=x_label,
+                            yaxis_title=y_label,
+                            height=500,
+                            template="plotly_white"
+                        )
+                        
+                        st.plotly_chart(fig_uv, use_container_width=True)
+                        
+                        # Download spectrum data
+                        uv_df = pd.DataFrame({
+                            'x_values': x,
+                            'y_values': y,
+                            'x_unit': x_label,
+                            'y_unit': y_label
+                        })
+                        csv = uv_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Spectrum Data",
+                            data=csv,
+                            file_name="uv_vis_spectrum.csv",
+                            mime="text/csv"
+                        )
     
     # ========================================================================
-    # Tab 3: Fluorescence Spectra (with all requested features)
+    # Tab 3: Fluorescence Spectra (with Generate Plot button)
     # ========================================================================
     with viz_tabs[2]:
         st.markdown("### ✨ Fluorescence Spectra Analysis")
@@ -3578,17 +3588,40 @@ def display_advanced_visualization(uploaded_file):
                     if fl_data is not None:
                         fl_data.columns = fl_data.columns.str.lower().str.replace(' ', '_')
                         
-                        if 'emission_wavelength' in fl_data.columns and 'emission_intensity' in fl_data.columns:
-                            fl_emission_wave = fl_data['emission_wavelength'].values
-                            fl_emission_int = fl_data['emission_intensity'].values
-                            st.session_state['fl_emission_wave'] = fl_emission_wave
-                            st.session_state['fl_emission_int'] = fl_emission_int
+                        # Try to identify columns
+                        wavelength_col = None
+                        intensity_col = None
                         
-                        if 'excitation_wavelength' in fl_data.columns and 'excitation_intensity' in fl_data.columns:
-                            fl_excitation_wave = fl_data['excitation_wavelength'].values
-                            fl_excitation_int = fl_data['excitation_intensity'].values
-                            st.session_state['fl_excitation_wave'] = fl_excitation_wave
-                            st.session_state['fl_excitation_int'] = fl_excitation_int
+                        for col in fl_data.columns:
+                            if any(x in col for x in ['wave', 'lambda', 'wl', 'nm']):
+                                wavelength_col = col
+                            if any(x in col for x in ['intensity', 'fluor', 'emission', 'excitation']):
+                                intensity_col = col
+                        
+                        if wavelength_col is None:
+                            wavelength_col = fl_data.columns[0]
+                        if intensity_col is None:
+                            intensity_col = fl_data.columns[1] if len(fl_data.columns) > 1 else fl_data.columns[0]
+                        
+                        # Convert to numeric
+                        wavelength = pd.to_numeric(fl_data[wavelength_col], errors='coerce').dropna().values
+                        intensity = pd.to_numeric(fl_data[intensity_col], errors='coerce').dropna().values
+                        
+                        # Ensure same length
+                        min_len = min(len(wavelength), len(intensity))
+                        wavelength = wavelength[:min_len]
+                        intensity = intensity[:min_len]
+                        
+                        # Store based on spectrum type
+                        if spectrum_type in ["Emission", "Both"]:
+                            st.session_state['fl_emission_wave'] = wavelength
+                            st.session_state['fl_emission_int'] = intensity
+                            st.session_state['fl_has_emission'] = True
+                        
+                        if spectrum_type in ["Excitation", "Both"]:
+                            st.session_state['fl_excitation_wave'] = wavelength
+                            st.session_state['fl_excitation_int'] = intensity
+                            st.session_state['fl_has_excitation'] = True
                         
                         st.success(f"✅ Loaded fluorescence data (encoding: {encoding})")
                     else:
@@ -3608,209 +3641,221 @@ def display_advanced_visualization(uploaded_file):
                 
                 wavelength_range = st.slider("Wavelength Range (nm)", 200, 1000, (300, 800), key="fl_range")
                 resolution = st.number_input("Resolution (points)", 100, 1000, 500, key="fl_res")
-                
-                if st.button("Generate Fluorescence Spectrum", use_container_width=True):
-                    fl_wavelength = np.linspace(wavelength_range[0], wavelength_range[1], resolution)
-                    
-                    if spectrum_type in ["Emission", "Both"]:
-                        fl_emission = fl_emission_height * np.exp(-((fl_wavelength - fl_emission_center)**2) / (2 * fl_emission_width**2))
-                        st.session_state['fl_emission_wave'] = fl_wavelength
-                        st.session_state['fl_emission_int'] = fl_emission
-                    
-                    if spectrum_type in ["Excitation", "Both"]:
-                        fl_excitation = fl_excitation_height * np.exp(-((fl_wavelength - fl_excitation_center)**2) / (2 * fl_excitation_width**2))
-                        st.session_state['fl_excitation_wave'] = fl_wavelength
-                        st.session_state['fl_excitation_int'] = fl_excitation
-                    
-                    st.success("✅ Generated synthetic fluorescence spectra")
             
             # Fluorescence Processing Options
-            if 'fl_emission_int' in st.session_state or 'fl_excitation_int' in st.session_state:
-                with st.expander("🔧 Processing Options", expanded=True):
-                    st.markdown("#### 📊 Data Processing")
-                    
-                    # Normalization options
-                    fl_norm = st.selectbox(
-                        "Normalization",
-                        ["None", "Normalize to 1", "Normalize to 100%", "Min-Max Normalize"],
-                        key="fl_norm"
-                    )
-                    
-                    # Smoothing
-                    smooth_fl = st.checkbox("Smooth Spectrum", value=False, key="smooth_fl")
-                    if smooth_fl:
-                        fl_smooth_window = st.slider("Smoothing Window", 3, 21, 5, step=2, key="fl_smooth_window")
-                    
-                    # Baseline correction
-                    baseline_fl = st.checkbox("Baseline Correct", value=False, key="baseline_fl")
-                    
-                    # Quantum Yield calculation
-                    st.markdown("#### 🎯 Quantum Yield")
-                    calculate_qy = st.checkbox("Calculate Quantum Yield", value=False, key="calc_qy")
-                    if calculate_qy:
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            reference_qy = st.number_input("Reference QY (%)", 0.0, 100.0, 95.0, key="ref_qy")
-                        with col_b:
-                            reference_area = st.number_input("Reference Area", 0.0, 10000.0, 1000.0, key="ref_area")
-                    
-                    # Lifetime calculation
-                    st.markdown("#### ⏱️ Lifetime")
-                    calculate_lifetime = st.checkbox("Calculate Lifetime", value=False, key="calc_lifetime")
-                    if calculate_lifetime:
-                        lifetime_method = st.selectbox(
-                            "Method",
-                            ["Single Exponential", "Stretched Exponential", "Bi-exponential"],
-                            key="lifetime_method"
-                        )
-                    
-                    # Axis conversions
-                    st.markdown("#### 📐 Axis Conversion")
-                    fl_x_axis = st.selectbox(
-                        "X-axis",
-                        ["Wavelength (nm)", "Wavenumber (cm⁻¹)", "Energy (eV)"],
-                        key="fl_x_axis"
-                    )
-                    
-                    # Peak analysis
-                    st.markdown("#### 📈 Peak Analysis")
-                    find_peaks_fl = st.checkbox("Find and Label Peaks", value=True, key="find_peaks_fl")
-                    calculate_fwhm_fl = st.checkbox("Calculate FWHM", value=True, key="fwhm_fl")
-                    
-                    # Overlay/Stack
-                    st.markdown("#### 🔄 Display Options")
-                    fl_display_mode = st.radio(
-                        "Display Mode",
-                        ["Single", "Overlay", "Stack"],
-                        key="fl_display"
-                    )
-        
-        with col2:
-            st.markdown("#### 📈 Spectrum Visualization")
-            
-            if spectrum_type in ["Emission", "Both"] and 'fl_emission_int' in st.session_state:
-                x = st.session_state['fl_emission_wave'].copy()
-                y = st.session_state['fl_emission_int'].copy()
-                spectrum_name = "Emission"
-            elif spectrum_type in ["Excitation", "Both"] and 'fl_excitation_int' in st.session_state:
-                x = st.session_state['fl_excitation_wave'].copy()
-                y = st.session_state['fl_excitation_int'].copy()
-                spectrum_name = "Excitation"
-            else:
-                st.info("👆 Generate or upload fluorescence data to display spectrum")
-                st.stop()
-            
-            # Apply processing
-            if smooth_fl:
-                y = smooth_spectrum(y, fl_smooth_window)
-            
-            if baseline_fl:
-                y = y - np.min(y)
-            
-            if fl_norm == "Normalize to 1":
-                y = y / np.max(y)
-            elif fl_norm == "Normalize to 100%":
-                y = y / np.max(y) * 100
-            elif fl_norm == "Min-Max Normalize":
-                y = (y - np.min(y)) / (np.max(y) - np.min(y))
-            
-            # Convert x-axis if needed
-            x_label = "Wavelength (nm)"
-            if fl_x_axis == "Wavenumber (cm⁻¹)":
-                x = convert_wavelength_to_wavenumber(x)
-                x_label = "Wavenumber (cm⁻¹)"
-            elif fl_x_axis == "Energy (eV)":
-                x = convert_wavelength_to_ev(x)
-                x_label = "Energy (eV)"
-            
-            # Create figure
-            fig_fl = go.Figure()
-            
-            fig_fl.add_trace(go.Scatter(
-                x=x,
-                y=y,
-                mode='lines',
-                name=spectrum_name,
-                line=dict(color='green', width=2),
-                fill='tozeroy' if fl_display_mode == "Stack" else None,
-                fillcolor='rgba(0,255,0,0.1)' if fl_display_mode == "Stack" else None
-            ))
-            
-            if spectrum_type == "Both" and 'fl_excitation_int' in st.session_state and 'fl_emission_int' in st.session_state:
-                x_ex = st.session_state['fl_excitation_wave'].copy()
-                y_ex = st.session_state['fl_excitation_int'].copy()
-                
-                if fl_x_axis == "Wavenumber (cm⁻¹)":
-                    x_ex = convert_wavelength_to_wavenumber(x_ex)
-                elif fl_x_axis == "Energy (eV)":
-                    x_ex = convert_wavelength_to_ev(x_ex)
-                
-                if fl_norm == "Normalize to 1":
-                    y_ex = y_ex / np.max(y_ex)
-                
-                fig_fl.add_trace(go.Scatter(
-                    x=x_ex,
-                    y=y_ex,
-                    mode='lines',
-                    name='Excitation',
-                    line=dict(color='blue', width=2)
-                ))
-            
-            # Find and label peaks
-            if find_peaks_fl:
-                from scipy.signal import find_peaks
-                peaks, properties = find_peaks(y, height=0.05*np.max(y), distance=10)
-                
-                if len(peaks) > 0:
-                    fig_fl.add_trace(go.Scatter(
-                        x=x[peaks],
-                        y=y[peaks],
-                        mode='markers',
-                        name='Peaks',
-                        marker=dict(color='red', size=10, symbol='star')
-                    ))
-                    
-                    for peak_idx in peaks[:3]:
-                        fig_fl.add_annotation(
-                            x=x[peak_idx],
-                            y=y[peak_idx],
-                            text=f"{x[peak_idx]:.1f}",
-                            showarrow=True,
-                            arrowhead=2
-                        )
-                        
-                        if calculate_fwhm_fl:
-                            fwhm = calculate_fwhm(x, y)
-                            if fwhm:
-                                st.metric(f"FWHM", f"{fwhm:.1f} {x_label.split()[0]}")
-            
-            # Calculate quantum yield if requested
-            if calculate_qy and 'fl_emission_int' in st.session_state:
-                sample_area = np.trapz(y, x)
-                if sample_area > 0 and reference_area > 0:
-                    qy = reference_qy * (sample_area / reference_area)
-                    st.metric("Quantum Yield", f"{qy:.2f}%")
-            
-            fig_fl.update_layout(
-                title=f"Fluorescence {spectrum_name} Spectrum",
-                xaxis_title=x_label,
-                yaxis_title="Intensity (a.u.)",
-                height=500,
-                template="plotly_white"
-            )
-            
-            st.plotly_chart(fig_fl, use_container_width=True)
+            fl_processing_expander = st.expander("🔧 Processing Options", expanded=True)
             
             # Generate Plot button
-            if st.button("🎨 Generate Fluorescence Plot", use_container_width=True):
-                st.success("Plot generated successfully!")
-            
-            # Calculate and display Stokes shift if both spectra available
-            if spectrum_type == "Both" and 'fl_emission_int' in st.session_state and 'fl_excitation_int' in st.session_state:
-                em_max_idx = np.argmax(st.session_state['fl_emission_int'])
-                ex_max_idx = np.argmax(st.session_state['fl_excitation_int'])
-                stokes_shift = st.session_state['fl_emission_wave'][em_max_idx] - st.session_state['fl_excitation_wave'][ex_max_idx]
-                st.metric("Stokes Shift", f"{stokes_shift:.1f} nm")
+            if st.button("🎨 Generate Fluorescence Plot", use_container_width=True, type="primary"):
+                with st.spinner("Generating fluorescence spectrum..."):
+                    
+                    # Generate synthetic data if needed
+                    if fl_source == "Generate Synthetic Spectrum":
+                        fl_wavelength = np.linspace(wavelength_range[0], wavelength_range[1], resolution)
+                        
+                        if spectrum_type in ["Emission", "Both"]:
+                            fl_emission = fl_emission_height * np.exp(-((fl_wavelength - fl_emission_center)**2) / (2 * fl_emission_width**2))
+                            st.session_state['fl_emission_wave'] = fl_wavelength
+                            st.session_state['fl_emission_int'] = fl_emission
+                            st.session_state['fl_has_emission'] = True
+                        
+                        if spectrum_type in ["Excitation", "Both"]:
+                            fl_excitation = fl_excitation_height * np.exp(-((fl_wavelength - fl_excitation_center)**2) / (2 * fl_excitation_width**2))
+                            st.session_state['fl_excitation_wave'] = fl_wavelength
+                            st.session_state['fl_excitation_int'] = fl_excitation
+                            st.session_state['fl_has_excitation'] = True
+                    
+                    # Check if we have data
+                    has_data = False
+                    if spectrum_type in ["Emission", "Both"] and 'fl_has_emission' in st.session_state:
+                        has_data = True
+                        x = st.session_state['fl_emission_wave'].copy()
+                        y = st.session_state['fl_emission_int'].copy()
+                        spectrum_name = "Emission"
+                    elif spectrum_type in ["Excitation", "Both"] and 'fl_has_excitation' in st.session_state:
+                        has_data = True
+                        x = st.session_state['fl_excitation_wave'].copy()
+                        y = st.session_state['fl_excitation_int'].copy()
+                        spectrum_name = "Excitation"
+                    
+                    if not has_data:
+                        st.warning("Please generate or upload data first")
+                    else:
+                        with fl_processing_expander:
+                            st.markdown("#### 📊 Data Processing")
+                            
+                            # Normalization options
+                            fl_norm = st.selectbox(
+                                "Normalization",
+                                ["None", "Normalize to 1", "Normalize to 100%", "Min-Max Normalize"],
+                                key="fl_norm"
+                            )
+                            
+                            # Smoothing
+                            smooth_fl = st.checkbox("Smooth Spectrum", value=False, key="smooth_fl")
+                            if smooth_fl:
+                                fl_smooth_window = st.slider("Smoothing Window", 3, 21, 5, step=2, key="fl_smooth_window")
+                                y = smooth_spectrum(y, fl_smooth_window)
+                            
+                            # Baseline correction
+                            baseline_fl = st.checkbox("Baseline Correct", value=False, key="baseline_fl")
+                            if baseline_fl:
+                                y = y - np.min(y)
+                            
+                            # Apply normalization
+                            if fl_norm == "Normalize to 1":
+                                y = y / np.max(y) if np.max(y) > 0 else y
+                            elif fl_norm == "Normalize to 100%":
+                                y = y / np.max(y) * 100 if np.max(y) > 0 else y
+                            elif fl_norm == "Min-Max Normalize":
+                                y = (y - np.min(y)) / (np.max(y) - np.min(y)) if (np.max(y) - np.min(y)) > 0 else y
+                            
+                            # Quantum Yield calculation
+                            st.markdown("#### 🎯 Quantum Yield")
+                            calculate_qy = st.checkbox("Calculate Quantum Yield", value=False, key="calc_qy")
+                            if calculate_qy:
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    reference_qy = st.number_input("Reference QY (%)", 0.0, 100.0, 95.0, key="ref_qy")
+                                with col_b:
+                                    reference_area = st.number_input("Reference Area", 0.0, 10000.0, 1000.0, key="ref_area")
+                            
+                            # Axis conversions
+                            st.markdown("#### 📐 Axis Conversion")
+                            fl_x_axis = st.selectbox(
+                                "X-axis",
+                                ["Wavelength (nm)", "Wavenumber (cm⁻¹)", "Energy (eV)"],
+                                key="fl_x_axis"
+                            )
+                            
+                            # Peak analysis
+                            st.markdown("#### 📈 Peak Analysis")
+                            find_peaks_fl = st.checkbox("Find and Label Peaks", value=True, key="find_peaks_fl")
+                            calculate_fwhm_fl = st.checkbox("Calculate FWHM", value=True, key="fwhm_fl")
+                            
+                            # Overlay/Stack
+                            st.markdown("#### 🔄 Display Options")
+                            fl_display_mode = st.radio(
+                                "Display Mode",
+                                ["Single", "Overlay", "Stack"],
+                                key="fl_display"
+                            )
+                        
+                        # Convert x-axis if needed
+                        x_label = "Wavelength (nm)"
+                        if fl_x_axis == "Wavenumber (cm⁻¹)":
+                            x = convert_wavelength_to_wavenumber(x)
+                            x_label = "Wavenumber (cm⁻¹)"
+                        elif fl_x_axis == "Energy (eV)":
+                            x = convert_wavelength_to_ev(x)
+                            x_label = "Energy (eV)"
+                        
+                        # Create figure
+                        fig_fl = go.Figure()
+                        
+                        fig_fl.add_trace(go.Scatter(
+                            x=x,
+                            y=y,
+                            mode='lines',
+                            name=spectrum_name,
+                            line=dict(color='green', width=2),
+                            fill='tozeroy' if fl_display_mode == "Stack" else None,
+                            fillcolor='rgba(0,255,0,0.1)' if fl_display_mode == "Stack" else None
+                        ))
+                        
+                        # Add excitation spectrum if both selected
+                        if spectrum_type == "Both" and 'fl_has_excitation' in st.session_state and 'fl_has_emission' in st.session_state:
+                            x_ex = st.session_state['fl_excitation_wave'].copy()
+                            y_ex = st.session_state['fl_excitation_int'].copy()
+                            
+                            # Apply same processing
+                            if smooth_fl:
+                                y_ex = smooth_spectrum(y_ex, fl_smooth_window)
+                            if baseline_fl:
+                                y_ex = y_ex - np.min(y_ex)
+                            if fl_norm == "Normalize to 1":
+                                y_ex = y_ex / np.max(y_ex) if np.max(y_ex) > 0 else y_ex
+                            
+                            # Convert x-axis
+                            if fl_x_axis == "Wavenumber (cm⁻¹)":
+                                x_ex = convert_wavelength_to_wavenumber(x_ex)
+                            elif fl_x_axis == "Energy (eV)":
+                                x_ex = convert_wavelength_to_ev(x_ex)
+                            
+                            fig_fl.add_trace(go.Scatter(
+                                x=x_ex,
+                                y=y_ex,
+                                mode='lines',
+                                name='Excitation',
+                                line=dict(color='blue', width=2)
+                            ))
+                        
+                        # Find and label peaks
+                        if find_peaks_fl:
+                            from scipy.signal import find_peaks
+                            peaks, properties = find_peaks(y, height=0.05*np.max(y), distance=10)
+                            
+                            if len(peaks) > 0:
+                                fig_fl.add_trace(go.Scatter(
+                                    x=x[peaks],
+                                    y=y[peaks],
+                                    mode='markers',
+                                    name='Peaks',
+                                    marker=dict(color='red', size=10, symbol='star')
+                                ))
+                                
+                                for peak_idx in peaks[:3]:
+                                    fig_fl.add_annotation(
+                                        x=x[peak_idx],
+                                        y=y[peak_idx],
+                                        text=f"{x[peak_idx]:.1f}",
+                                        showarrow=True,
+                                        arrowhead=2
+                                    )
+                                    
+                                    if calculate_fwhm_fl:
+                                        fwhm = calculate_fwhm(x, y)
+                                        if fwhm:
+                                            st.metric(f"FWHM", f"{fwhm:.1f} {x_label.split()[0]}")
+                        
+                        # Calculate quantum yield if requested
+                        if calculate_qy and 'fl_has_emission' in st.session_state:
+                            sample_area = np.trapz(y, x)
+                            if sample_area > 0 and reference_area > 0:
+                                qy = reference_qy * (sample_area / reference_area)
+                                st.metric("Quantum Yield", f"{qy:.2f}%")
+                        
+                        fig_fl.update_layout(
+                            title=f"Fluorescence {spectrum_name} Spectrum",
+                            xaxis_title=x_label,
+                            yaxis_title="Intensity (a.u.)",
+                            height=500,
+                            template="plotly_white"
+                        )
+                        
+                        st.plotly_chart(fig_fl, use_container_width=True)
+                        
+                        # Calculate and display Stokes shift if both spectra available
+                        if spectrum_type == "Both" and 'fl_has_emission' in st.session_state and 'fl_has_excitation' in st.session_state:
+                            em_max_idx = np.argmax(st.session_state['fl_emission_int'])
+                            ex_max_idx = np.argmax(st.session_state['fl_excitation_int'])
+                            stokes_shift = st.session_state['fl_emission_wave'][em_max_idx] - st.session_state['fl_excitation_wave'][ex_max_idx]
+                            st.metric("Stokes Shift", f"{stokes_shift:.1f} nm")
+                        
+                        # Download spectrum data
+                        fl_df = pd.DataFrame({
+                            'x_values': x,
+                            'y_values': y,
+                            'x_unit': x_label,
+                            'y_unit': 'Intensity'
+                        })
+                        csv = fl_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Spectrum Data",
+                            data=csv,
+                            file_name="fluorescence_spectrum.csv",
+                            mime="text/csv"
+                        )
     
     # ========================================================================
     # Tab 4: IR Spectra (with all requested features)
@@ -3842,14 +3887,33 @@ def display_advanced_visualization(uploaded_file):
                     if ir_data is not None:
                         ir_data.columns = ir_data.columns.str.lower().str.replace(' ', '_')
                         
-                        wave_col = next((c for c in ir_data.columns if 'wave' in c or 'cm-1' in c), ir_data.columns[0])
-                        trans_col = next((c for c in ir_data.columns if 'trans' in c or 'intensity' in c), ir_data.columns[1])
+                        # Try to identify columns
+                        wave_col = None
+                        trans_col = None
                         
-                        ir_wavenumber = ir_data[wave_col].values
-                        ir_transmittance = ir_data[trans_col].values
+                        for col in ir_data.columns:
+                            if any(x in col for x in ['wave', 'cm-1', 'wn']):
+                                wave_col = col
+                            if any(x in col for x in ['trans', 'intensity', 't%']):
+                                trans_col = col
+                        
+                        if wave_col is None:
+                            wave_col = ir_data.columns[0]
+                        if trans_col is None:
+                            trans_col = ir_data.columns[1] if len(ir_data.columns) > 1 else ir_data.columns[0]
+                        
+                        # Convert to numeric
+                        ir_wavenumber = pd.to_numeric(ir_data[wave_col], errors='coerce').dropna().values
+                        ir_transmittance = pd.to_numeric(ir_data[trans_col], errors='coerce').dropna().values
+                        
+                        # Ensure same length
+                        min_len = min(len(ir_wavenumber), len(ir_transmittance))
+                        ir_wavenumber = ir_wavenumber[:min_len]
+                        ir_transmittance = ir_transmittance[:min_len]
                         
                         st.session_state['ir_wavenumber'] = ir_wavenumber
                         st.session_state['ir_transmittance'] = ir_transmittance
+                        st.session_state['ir_has_data'] = True
                         st.success(f"✅ Loaded IR data with {len(ir_wavenumber)} points (encoding: {encoding})")
                     else:
                         st.error("Could not read file. Please check the format.")
@@ -3873,160 +3937,154 @@ def display_advanced_visualization(uploaded_file):
                 
                 wavenumber_range = st.slider("Wavenumber Range (cm⁻¹)", 400, 4000, (500, 3500), key="ir_range")
                 resolution = st.number_input("Resolution (points)", 100, 2000, 1000, key="ir_res")
-                
-                if st.button("Generate IR Spectrum", use_container_width=True):
-                    ir_wavenumber = np.linspace(wavenumber_range[0], wavenumber_range[1], resolution)
-                    ir_transmittance = np.ones_like(ir_wavenumber)
-                    
-                    for peak in ir_peaks:
-                        lorentzian = peak['height'] / (1 + ((ir_wavenumber - peak['center']) / peak['width'])**2)
-                        ir_transmittance -= lorentzian
-                    
-                    ir_transmittance = np.clip(ir_transmittance, 0, 1)
-                    
-                    st.session_state['ir_wavenumber'] = ir_wavenumber
-                    st.session_state['ir_transmittance'] = ir_transmittance
-                    st.success("✅ Generated synthetic IR spectrum")
             
             # IR Processing Options
-            if 'ir_wavenumber' in st.session_state:
-                with st.expander("🔧 Processing Options", expanded=True):
-                    st.markdown("#### 📊 Data Processing")
-                    
-                    # Normalize transmittance to 0-100%
-                    normalize_ir = st.checkbox("Normalize Transmittance (0-100%)", value=True, key="norm_ir")
-                    
-                    # Smoothing
-                    smooth_ir = st.checkbox("Smooth Spectrum", value=False, key="smooth_ir")
-                    if smooth_ir:
-                        ir_smooth_window = st.slider("Smoothing Window", 3, 21, 5, step=2, key="ir_smooth_window")
-                    
-                    # Baseline correction
-                    baseline_ir = st.checkbox("Baseline Correct", value=False, key="baseline_ir")
-                    
-                    # Convert to different y-axis units
-                    st.markdown("#### 📐 Axis Conversion")
-                    ir_y_axis = st.selectbox(
-                        "Y-axis",
-                        ["% Transmittance", "Absorbance", "Intensity"],
-                        key="ir_y_axis"
-                    )
-                    
-                    # Peak analysis
-                    st.markdown("#### 📈 Peak Analysis")
-                    find_peaks_ir = st.checkbox("Find and Label Peaks", value=True, key="find_peaks_ir")
-                    peak_threshold = st.slider("Peak Threshold", 0.01, 0.3, 0.05, key="ir_threshold")
-                    
-                    # Overlay/Stack
-                    st.markdown("#### 🔄 Display Options")
-                    ir_display_mode = st.radio(
-                        "Display Mode",
-                        ["Single", "Overlay", "Stack"],
-                        key="ir_display"
-                    )
-        
-        with col2:
-            st.markdown("#### 📈 Spectrum Visualization")
+            ir_processing_expander = st.expander("🔧 Processing Options", expanded=True)
             
-            if 'ir_wavenumber' in st.session_state and 'ir_transmittance' in st.session_state:
-                x = st.session_state['ir_wavenumber'].copy()
-                y = st.session_state['ir_transmittance'].copy()
-                
-                # Apply smoothing
-                if smooth_ir:
-                    y = smooth_spectrum(y, ir_smooth_window)
-                
-                # Apply baseline correction
-                if baseline_ir:
-                    y = y - np.min(y)
-                    y = y / np.max(y)
-                
-                # Normalize to 0-100% if requested
-                if normalize_ir:
-                    y = y * 100
-                
-                # Convert y-axis if needed
-                y_label = ir_y_axis
-                if ir_y_axis == "Absorbance":
-                    y = -np.log(y/100) if normalize_ir else -np.log(y)
-                    y_label = "Absorbance"
-                elif ir_y_axis == "Intensity":
-                    # Keep as is but label appropriately
-                    y_label = "Intensity (a.u.)"
-                else:
-                    y_label = "Transmittance (%)"
-                
-                # Create figure
-                fig_ir = go.Figure()
-                
-                fig_ir.add_trace(go.Scatter(
-                    x=x,
-                    y=y,
-                    mode='lines',
-                    name='IR Spectrum',
-                    line=dict(color='purple', width=2)
-                ))
-                
-                # Find and label peaks (in absorbance mode for better peak detection)
-                if find_peaks_ir:
-                    from scipy.signal import find_peaks
+            # Generate Plot button
+            if st.button("🎨 Generate IR Plot", use_container_width=True, type="primary"):
+                with st.spinner("Generating IR spectrum..."):
                     
-                    # Use absorbance for peak detection
-                    y_for_peaks = -np.log(st.session_state['ir_transmittance']) if not normalize_ir else -np.log(y/100)
+                    # Generate synthetic data if needed
+                    if ir_source == "Generate Synthetic Spectrum":
+                        ir_wavenumber = np.linspace(wavenumber_range[0], wavenumber_range[1], resolution)
+                        ir_transmittance = np.ones_like(ir_wavenumber)
+                        
+                        for peak in ir_peaks:
+                            lorentzian = peak['height'] / (1 + ((ir_wavenumber - peak['center']) / peak['width'])**2)
+                            ir_transmittance -= lorentzian
+                        
+                        ir_transmittance = np.clip(ir_transmittance, 0, 1)
+                        
+                        st.session_state['ir_wavenumber'] = ir_wavenumber
+                        st.session_state['ir_transmittance'] = ir_transmittance
+                        st.session_state['ir_has_data'] = True
                     
-                    peaks, properties = find_peaks(y_for_peaks, height=peak_threshold, distance=20)
-                    
-                    if len(peaks) > 0:
+                    # Check if we have data
+                    if 'ir_has_data' not in st.session_state or not st.session_state['ir_has_data']:
+                        st.warning("Please generate or upload data first")
+                    else:
+                        x = st.session_state['ir_wavenumber'].copy()
+                        y = st.session_state['ir_transmittance'].copy()
+                        
+                        with ir_processing_expander:
+                            st.markdown("#### 📊 Data Processing")
+                            
+                            # Normalize transmittance to 0-100%
+                            normalize_ir = st.checkbox("Normalize Transmittance (0-100%)", value=True, key="norm_ir")
+                            
+                            # Smoothing
+                            smooth_ir = st.checkbox("Smooth Spectrum", value=False, key="smooth_ir")
+                            if smooth_ir:
+                                ir_smooth_window = st.slider("Smoothing Window", 3, 21, 5, step=2, key="ir_smooth_window")
+                                y = smooth_spectrum(y, ir_smooth_window)
+                            
+                            # Baseline correction
+                            baseline_ir = st.checkbox("Baseline Correct", value=False, key="baseline_ir")
+                            if baseline_ir:
+                                y = y - np.min(y)
+                                y = y / np.max(y)
+                            
+                            # Normalize to 0-100% if requested
+                            if normalize_ir:
+                                y = y * 100
+                            
+                            # Convert to different y-axis units
+                            st.markdown("#### 📐 Axis Conversion")
+                            ir_y_axis = st.selectbox(
+                                "Y-axis",
+                                ["% Transmittance", "Absorbance", "Intensity"],
+                                key="ir_y_axis"
+                            )
+                            
+                            # Peak analysis
+                            st.markdown("#### 📈 Peak Analysis")
+                            find_peaks_ir = st.checkbox("Find and Label Peaks", value=True, key="find_peaks_ir")
+                            peak_threshold = st.slider("Peak Threshold", 0.01, 0.3, 0.05, key="ir_threshold")
+                            
+                            # Overlay/Stack
+                            st.markdown("#### 🔄 Display Options")
+                            ir_display_mode = st.radio(
+                                "Display Mode",
+                                ["Single", "Overlay", "Stack"],
+                                key="ir_display"
+                            )
+                        
+                        # Convert y-axis if needed
+                        y_label = ir_y_axis
+                        if ir_y_axis == "Absorbance":
+                            y = -np.log(y/100) if normalize_ir else -np.log(y)
+                            y_label = "Absorbance"
+                        elif ir_y_axis == "Intensity":
+                            y_label = "Intensity (a.u.)"
+                        else:
+                            y_label = "Transmittance (%)"
+                        
+                        # Create figure
+                        fig_ir = go.Figure()
+                        
                         fig_ir.add_trace(go.Scatter(
-                            x=x[peaks],
-                            y=y[peaks],
-                            mode='markers',
-                            name='Peaks',
-                            marker=dict(color='red', size=8, symbol='diamond')
+                            x=x,
+                            y=y,
+                            mode='lines',
+                            name='IR Spectrum',
+                            line=dict(color='purple', width=2)
                         ))
                         
-                        for i, peak_idx in enumerate(peaks[:5]):
-                            fig_ir.add_annotation(
-                                x=x[peak_idx],
-                                y=y[peak_idx],
-                                text=f"{x[peak_idx]:.0f} cm⁻¹",
-                                showarrow=True,
-                                arrowhead=2,
-                                ax=0,
-                                ay=-30
-                            )
-                
-                # Invert x-axis (typical for IR spectra)
-                fig_ir.update_xaxes(autorange="reversed")
-                
-                fig_ir.update_layout(
-                    title="IR Absorption Spectrum",
-                    xaxis_title="Wavenumber (cm⁻¹)",
-                    yaxis_title=y_label,
-                    height=500,
-                    template="plotly_white"
-                )
-                
-                st.plotly_chart(fig_ir, use_container_width=True)
-                
-                # Generate Plot button
-                if st.button("🎨 Generate IR Plot", use_container_width=True):
-                    st.success("Plot generated successfully!")
-                
-                # Download spectrum data
-                ir_df = pd.DataFrame({
-                    'wavenumber_cm-1': x,
-                    y_label: y
-                })
-                csv = ir_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download IR Spectrum Data",
-                    data=csv,
-                    file_name="ir_spectrum.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("👆 Generate or upload IR data to display spectrum")
+                        # Find and label peaks (in absorbance mode for better peak detection)
+                        if find_peaks_ir:
+                            from scipy.signal import find_peaks
+                            
+                            # Use absorbance for peak detection
+                            y_for_peaks = -np.log(st.session_state['ir_transmittance']) if not normalize_ir else -np.log(y/100)
+                            
+                            peaks, properties = find_peaks(y_for_peaks, height=peak_threshold, distance=20)
+                            
+                            if len(peaks) > 0:
+                                fig_ir.add_trace(go.Scatter(
+                                    x=x[peaks],
+                                    y=y[peaks],
+                                    mode='markers',
+                                    name='Peaks',
+                                    marker=dict(color='red', size=8, symbol='diamond')
+                                ))
+                                
+                                for i, peak_idx in enumerate(peaks[:5]):
+                                    fig_ir.add_annotation(
+                                        x=x[peak_idx],
+                                        y=y[peak_idx],
+                                        text=f"{x[peak_idx]:.0f} cm⁻¹",
+                                        showarrow=True,
+                                        arrowhead=2,
+                                        ax=0,
+                                        ay=-30
+                                    )
+                        
+                        # Invert x-axis (typical for IR spectra)
+                        fig_ir.update_xaxes(autorange="reversed")
+                        
+                        fig_ir.update_layout(
+                            title="IR Absorption Spectrum",
+                            xaxis_title="Wavenumber (cm⁻¹)",
+                            yaxis_title=y_label,
+                            height=500,
+                            template="plotly_white"
+                        )
+                        
+                        st.plotly_chart(fig_ir, use_container_width=True)
+                        
+                        # Download spectrum data
+                        ir_df = pd.DataFrame({
+                            'wavenumber_cm-1': x,
+                            y_label: y
+                        })
+                        csv = ir_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download IR Spectrum Data",
+                            data=csv,
+                            file_name="ir_spectrum.csv",
+                            mime="text/csv"
+                        )
     
     # ========================================================================
     # Tab 5: Spectral Comparison (Enhanced)
@@ -4042,13 +4100,13 @@ def display_advanced_visualization(uploaded_file):
         
         # Check what spectra are available
         available_spectra = []
-        if 'uv_wavelength' in st.session_state:
+        if 'uv_has_data' in st.session_state and st.session_state['uv_has_data']:
             available_spectra.append("UV/Vis Spectrum")
-        if 'fl_emission_int' in st.session_state:
+        if 'fl_has_emission' in st.session_state:
             available_spectra.append("Fluorescence Emission")
-        if 'fl_excitation_int' in st.session_state:
+        if 'fl_has_excitation' in st.session_state:
             available_spectra.append("Fluorescence Excitation")
-        if 'ir_wavenumber' in st.session_state:
+        if 'ir_has_data' in st.session_state and st.session_state['ir_has_data']:
             available_spectra.append("IR Spectrum")
         
         if len(available_spectra) == 0:
@@ -4070,7 +4128,7 @@ def display_advanced_visualization(uploaded_file):
                     key="compare_x_axis"
                 )
             
-            if selected_spectra:
+            if selected_spectra and st.button("🎨 Generate Comparison Plot", use_container_width=True, type="primary"):
                 fig_compare = go.Figure()
                 
                 colors = {'UV/Vis Spectrum': 'blue', 
@@ -4088,7 +4146,7 @@ def display_advanced_visualization(uploaded_file):
                         elif x_axis_compare == "Energy (eV)":
                             x = convert_wavelength_to_ev(x)
                         
-                        if normalize_compare:
+                        if normalize_compare and np.max(y) > 0:
                             y = y / np.max(y)
                         
                         fig_compare.add_trace(go.Scatter(
@@ -4108,7 +4166,7 @@ def display_advanced_visualization(uploaded_file):
                         elif x_axis_compare == "Energy (eV)":
                             x = convert_wavelength_to_ev(x)
                         
-                        if normalize_compare:
+                        if normalize_compare and np.max(y) > 0:
                             y = y / np.max(y)
                         
                         fig_compare.add_trace(go.Scatter(
@@ -4128,7 +4186,7 @@ def display_advanced_visualization(uploaded_file):
                         elif x_axis_compare == "Energy (eV)":
                             x = convert_wavelength_to_ev(x)
                         
-                        if normalize_compare:
+                        if normalize_compare and np.max(y) > 0:
                             y = y / np.max(y)
                         
                         fig_compare.add_trace(go.Scatter(
@@ -4143,7 +4201,7 @@ def display_advanced_visualization(uploaded_file):
                         x = st.session_state['ir_wavenumber'].copy()
                         y = 1 - st.session_state['ir_transmittance']  # Convert to absorption
                         
-                        if normalize_compare:
+                        if normalize_compare and np.max(y) > 0:
                             y = y / np.max(y)
                         
                         fig_compare.add_trace(go.Scatter(
@@ -4164,9 +4222,31 @@ def display_advanced_visualization(uploaded_file):
                 
                 st.plotly_chart(fig_compare, use_container_width=True)
                 
-                # Generate Plot button
-                if st.button("🎨 Generate Comparison Plot", use_container_width=True):
-                    st.success("Comparison plot generated successfully!")
+                # Download comparison data
+                if st.button("📥 Download Comparison Data", use_container_width=True):
+                    comparison_df = pd.DataFrame()
+                    
+                    for spec in selected_spectra:
+                        if spec == "UV/Vis Spectrum" and 'uv_wavelength' in st.session_state:
+                            comparison_df['uv_wavelength_nm'] = st.session_state['uv_wavelength']
+                            comparison_df['uv_absorbance'] = st.session_state['uv_absorbance']
+                        elif spec == "Fluorescence Emission" and 'fl_emission_wave' in st.session_state:
+                            comparison_df['fl_emission_wavelength_nm'] = st.session_state['fl_emission_wave']
+                            comparison_df['fl_emission_intensity'] = st.session_state['fl_emission_int']
+                        elif spec == "Fluorescence Excitation" and 'fl_excitation_wave' in st.session_state:
+                            comparison_df['fl_excitation_wavelength_nm'] = st.session_state['fl_excitation_wave']
+                            comparison_df['fl_excitation_intensity'] = st.session_state['fl_excitation_int']
+                        elif spec == "IR Spectrum" and 'ir_wavenumber' in st.session_state:
+                            comparison_df['ir_wavenumber_cm-1'] = st.session_state['ir_wavenumber']
+                            comparison_df['ir_transmittance'] = st.session_state['ir_transmittance']
+                    
+                    csv = comparison_df.to_csv(index=False)
+                    st.download_button(
+                        label="Download CSV",
+                        data=csv,
+                        file_name="spectral_comparison.csv",
+                        mime="text/csv"
+                    )
 # ============================================================================
 # TAB 6: PCE Analyzer - UPDATED with Adaptive R² (Maximizing Linear Points)
 # ============================================================================
