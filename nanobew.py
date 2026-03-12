@@ -2997,8 +2997,8 @@ def display_molecular_generator_tab():
 # ============================================================================
 
 # ============================================================================
-# TAB 5: Advanced Visualization - COMPLETE OVERHAUL with all requested features
-# ============================================================================
+# TAB 5: Advanced Visualization - UPDATED with Spectral Analysis
+# ============================================================================                
 
 def display_advanced_visualization(uploaded_file):
     """Advanced visualization tab with comprehensive spectral analysis"""
