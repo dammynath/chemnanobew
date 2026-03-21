@@ -923,7 +923,7 @@ class QDDesignOfExperiments:
 
 
 # ============================================================================
-# REINFORCEMENT LEARNING FOR QDS
+# REINFORCEMENT LEARNING FOR QDS - FIXED with proper type handling
 # ============================================================================
 
 class QDReinforcementLearning:
@@ -945,6 +945,10 @@ class QDReinforcementLearning:
     
     def build_model(self):
         """Build neural network for Q-learning"""
+        import torch
+        import torch.nn as nn
+        import torch.optim as optim
+        
         class QNetwork(nn.Module):
             def __init__(self, state_size, action_size):
                 super().__init__()
@@ -963,30 +967,39 @@ class QDReinforcementLearning:
         self.criterion = nn.MSELoss()
     
     def remember(self, state, action, reward, next_state, done):
-        """Store experience in memory"""
-        self.memory.append((state, action, reward, next_state, done))
+        """Store experience in memory with proper type conversion"""
+        # Convert to float32 arrays to avoid type issues
+        state = np.array(state, dtype=np.float32).flatten()
+        next_state = np.array(next_state, dtype=np.float32).flatten()
+        self.memory.append((state, action, float(reward), next_state, done))
         if len(self.memory) > 10000:
             self.memory = self.memory[-10000:]
     
     def act(self, state, valid_actions=None):
         """Choose action using epsilon-greedy policy"""
+        state = np.array(state, dtype=np.float32).flatten()
+        
         if np.random.rand() <= self.epsilon:
             if valid_actions is not None:
                 return np.random.choice(valid_actions)
             return np.random.randint(self.action_size)
         
         if TORCH_AVAILABLE and self.model:
+            import torch
             state_tensor = torch.FloatTensor(state).unsqueeze(0)
             with torch.no_grad():
                 act_values = self.model(state_tensor)
             
             if valid_actions is not None:
                 # Mask invalid actions
-                mask = torch.ones(self.action_size) * -1e9
-                mask[valid_actions] = 0
-                act_values = act_values + mask
-            
-            return torch.argmax(act_values).item()
+                act_values_np = act_values.numpy().flatten()
+                masked_act_values = np.full(self.action_size, -np.inf)
+                for action in valid_actions:
+                    if action < self.action_size:
+                        masked_act_values[action] = act_values_np[action]
+                return np.argmax(masked_act_values)
+            else:
+                return torch.argmax(act_values).item()
         else:
             # Random fallback
             if valid_actions is not None:
@@ -998,10 +1011,15 @@ class QDReinforcementLearning:
         if len(self.memory) < batch_size or not TORCH_AVAILABLE or not self.model:
             return
         
+        import torch
+        
         minibatch = np.random.choice(len(self.memory), batch_size, replace=False)
         
         for idx in minibatch:
             state, action, reward, next_state, done = self.memory[idx]
+            # Ensure float32
+            state = np.array(state, dtype=np.float32).flatten()
+            next_state = np.array(next_state, dtype=np.float32).flatten()
             
             state_tensor = torch.FloatTensor(state).unsqueeze(0)
             next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
@@ -1011,10 +1029,9 @@ class QDReinforcementLearning:
                 with torch.no_grad():
                     target = reward + self.gamma * torch.max(self.model(next_state_tensor)).item()
             
-            # Update model
             self.optimizer.zero_grad()
             current_q = self.model(state_tensor)[0, action]
-            loss = self.criterion(current_q, torch.tensor(target))
+            loss = self.criterion(current_q, torch.tensor(target, dtype=torch.float32))
             loss.backward()
             self.optimizer.step()
         
@@ -1023,41 +1040,67 @@ class QDReinforcementLearning:
     
     def suggest_experiment(self, history_df, factor_ranges, target_col):
         """Suggest next experiment based on RL policy"""
+        # Ensure history_df has numeric columns only
+        param_cols = list(factor_ranges.keys())
+        
+        # Check that all required columns exist
+        missing_cols = [col for col in param_cols if col not in history_df.columns]
+        if missing_cols:
+            return {param: (factor_ranges[param][0] + factor_ranges[param][1]) / 2 
+                    for param in factor_ranges.keys()}
+        
+        # Clean the data
+        clean_df = history_df[param_cols + [target_col]].copy()
+        for col in clean_df.columns:
+            if not pd.api.types.is_numeric_dtype(clean_df[col]):
+                clean_df[col] = pd.to_numeric(clean_df[col], errors='coerce')
+        clean_df = clean_df.dropna().reset_index(drop=True)
+        
+        if len(clean_df) < 2:
+            # Not enough data, return random suggestion
+            suggestion = {}
+            for param, (low, high) in factor_ranges.items():
+                suggestion[param] = np.random.uniform(low, high)
+            return suggestion
         
         # Encode history as states
         states = []
         actions = []
         rewards = []
         
-        for i in range(len(history_df)-1):
-            # State = current parameters
-            state = history_df.iloc[i][list(factor_ranges.keys())].values
+        for i in range(len(clean_df)-1):
+            # State = current parameters (as float32)
+            state = clean_df.iloc[i][param_cols].values.astype(np.float32)
             states.append(state)
             
-            # Action = next parameters (simplified)
-            next_params = history_df.iloc[i+1][list(factor_ranges.keys())].values
+            # Action = next parameters
+            next_params = clean_df.iloc[i+1][param_cols].values.astype(np.float32)
             actions.append(next_params)
             
             # Reward = improvement in target
-            reward = history_df.iloc[i+1][target_col] - history_df.iloc[i][target_col]
+            reward = float(clean_df.iloc[i+1][target_col] - clean_df.iloc[i][target_col])
             rewards.append(reward)
         
         if len(states) > 0:
             # Learn from history
             for s, a, r in zip(states, actions, rewards):
-                self.remember(s, 0, r, a if len(actions) > 0 else s, False)
+                # Discretize action to index (simplified - use first dimension as action index)
+                action_idx = int((a[0] - factor_ranges[param_cols[0]][0]) / 
+                                 (factor_ranges[param_cols[0]][1] - factor_ranges[param_cols[0]][0]) * self.action_size)
+                action_idx = min(max(action_idx, 0), self.action_size - 1)
+                self.remember(s, action_idx, r, a if len(actions) > 0 else s, False)
             
             self.replay()
         
         # Suggest next experiment (simplified - random perturbation of best)
-        best_idx = history_df[target_col].idxmax()
-        best_params = history_df.loc[best_idx, list(factor_ranges.keys())].to_dict()
+        best_idx = clean_df[target_col].idxmax()
+        best_params = clean_df.loc[best_idx, param_cols].to_dict()
         
         suggestion = {}
         for param, (low, high) in factor_ranges.items():
-            # Add exploration noise
+            # Add exploration noise scaled by epsilon
             noise = np.random.normal(0, (high - low) * self.epsilon)
-            value = best_params[param] + noise
+            value = best_params.get(param, (low + high)/2) + noise
             suggestion[param] = np.clip(value, low, high)
         
         return suggestion
@@ -1870,9 +1913,9 @@ def display_quantum_dots_tab(uploaded_file):
             else:
                 st.info("Please select parameters with numeric data in the left panel")
     
-    # ========================================================================
-    # Tab 5: Reinforcement Learning - FIXED with type checking
-    # ========================================================================
+    # ============================================================================
+    # Tab 5: Reinforcement Learning - FIXED with proper data handling
+    # ============================================================================
     with qd_tabs[4]:
         st.markdown("### 🤖 Reinforcement Learning for Adaptive Experimentation")
         
@@ -1925,100 +1968,117 @@ def display_quantum_dots_tab(uploaded_file):
                 # Define factor ranges from numeric columns only
                 factor_ranges = {}
                 if qd_type == "CIS-Te/ZnS":
-                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
+                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
                 else:
                     param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
+                # Get only numeric parameters that exist in data
                 for param in param_list:
                     if param in data.columns and pd.api.types.is_numeric_dtype(data[param]):
-                        factor_ranges[param] = (data[param].min(), data[param].max())
+                        factor_ranges[param] = (float(data[param].min()), float(data[param].max()))
                 
                 if len(factor_ranges) == 0:
                     st.error("No numeric parameters found for RL optimization")
                 else:
-                    # Initialize RL agent
-                    state_size = len(factor_ranges)
-                    action_size = 10  # Simplified - discretized actions
+                    # Create cleaned dataframe with only numeric columns
+                    clean_cols = list(factor_ranges.keys()) + [target_property]
+                    cleaned_df = data[clean_cols].copy()
                     
-                    if use_deep_rl and TORCH_AVAILABLE:
-                        rl_agent = QDReinforcementLearning(state_size, action_size)
+                    # Ensure all columns are numeric
+                    for col in clean_cols:
+                        if not pd.api.types.is_numeric_dtype(cleaned_df[col]):
+                            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+                    
+                    # Drop rows with NaN values
+                    cleaned_df = cleaned_df.dropna().reset_index(drop=True)
+                    
+                    if len(cleaned_df) < 5:
+                        st.warning(f"Not enough clean data points for RL (found {len(cleaned_df)}). Need at least 5.")
                     else:
-                        rl_agent = None
-                    
-                    # Generate suggestions
-                    suggestions = []
-                    for _ in range(n_suggestions):
-                        if rl_agent:
-                            suggestion = rl_agent.suggest_experiment(data, factor_ranges, target_property)
+                        # Initialize RL agent
+                        state_size = len(factor_ranges)
+                        action_size = 10  # Simplified - discretized actions
+                        
+                        if use_deep_rl and TORCH_AVAILABLE:
+                            rl_agent = QDReinforcementLearning(state_size, action_size)
                         else:
-                            # Simple random perturbation
-                            if pd.api.types.is_numeric_dtype(data[target_property]):
-                                best_idx = data[target_property].idxmax()
+                            rl_agent = None
+                        
+                        # Generate suggestions
+                        suggestions = []
+                        for _ in range(n_suggestions):
+                            if rl_agent:
+                                # Use cleaned dataframe for RL
+                                suggestion = rl_agent.suggest_experiment(cleaned_df, factor_ranges, target_property)
                             else:
-                                # For categorical, just take first row
-                                best_idx = 0
+                                # Simple random perturbation of best point
+                                if pd.api.types.is_numeric_dtype(cleaned_df[target_property]):
+                                    best_idx = cleaned_df[target_property].idxmax()
+                                else:
+                                    best_idx = 0
+                                
+                                best_params = {}
+                                for param in factor_ranges.keys():
+                                    if param in cleaned_df.columns:
+                                        best_params[param] = cleaned_df.loc[best_idx, param]
+                                
+                                suggestion = {}
+                                for param, (low, high) in factor_ranges.items():
+                                    # Add exploration noise
+                                    noise = np.random.normal(0, (high - low) * exploration_rate)
+                                    value = best_params.get(param, (low + high)/2) + noise
+                                    suggestion[param] = np.clip(value, low, high)
                             
-                            best_params = {}
-                            for param in factor_ranges.keys():
-                                if param in data.columns:
-                                    best_params[param] = data.loc[best_idx, param]
-                            
-                            suggestion = {}
-                            for param, (low, high) in factor_ranges.items():
-                                # Add exploration noise
-                                noise = np.random.normal(0, (high - low) * exploration_rate)
-                                value = best_params.get(param, (low + high)/2) + noise
-                                suggestion[param] = np.clip(value, low, high)
+                            suggestions.append(suggestion)
                         
-                        suggestions.append(suggestion)
-                    
-                    # Display suggestions
-                    suggestion_df = pd.DataFrame(suggestions)
-                    st.success(f"✅ Generated {len(suggestion_df)} experiment suggestions")
-                    st.dataframe(suggestion_df, use_container_width=True)
-                    
-                    # Download suggestions
-                    csv = suggestion_df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Suggestions",
-                        data=csv,
-                        file_name=f"rl_suggestions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv"
-                    )
-                    
-                    # Visualize suggestions vs history
-                    if len(factor_ranges) >= 2:
-                        keys = list(factor_ranges.keys())
-                        fig = go.Figure()
+                        # Display suggestions
+                        suggestion_df = pd.DataFrame(suggestions)
+                        st.success(f"✅ Generated {len(suggestion_df)} experiment suggestions")
+                        st.dataframe(suggestion_df, use_container_width=True)
                         
-                        # Historical data
-                        fig.add_trace(go.Scatter(
-                            x=data[keys[0]],
-                            y=data[keys[1]],
-                            mode='markers',
-                            name='Historical',
-                            marker=dict(color='blue', size=8, opacity=0.5)
-                        ))
-                        
-                        # Suggestions
-                        fig.add_trace(go.Scatter(
-                            x=suggestion_df[keys[0]],
-                            y=suggestion_df[keys[1]],
-                            mode='markers',
-                            name='RL Suggestions',
-                            marker=dict(color='red', size=12, symbol='star')
-                        ))
-                        
-                        fig.update_layout(
-                            title="RL Suggestions vs Historical Data",
-                            xaxis_title=keys[0].replace('_', ' ').title(),
-                            yaxis_title=keys[1].replace('_', ' ').title()
+                        # Download suggestions
+                        csv = suggestion_df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Suggestions",
+                            data=csv,
+                            file_name=f"rl_suggestions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
                         )
                         
-                        st.plotly_chart(fig, use_container_width=True)
+                        # Visualize suggestions vs history
+                        if len(factor_ranges) >= 2:
+                            keys = list(factor_ranges.keys())
+                            fig = go.Figure()
+                            
+                            # Historical data (cleaned)
+                            fig.add_trace(go.Scatter(
+                                x=cleaned_df[keys[0]],
+                                y=cleaned_df[keys[1]],
+                                mode='markers',
+                                name='Historical',
+                                marker=dict(color='blue', size=8, opacity=0.5)
+                            ))
+                            
+                            # Suggestions
+                            fig.add_trace(go.Scatter(
+                                x=suggestion_df[keys[0]],
+                                y=suggestion_df[keys[1]],
+                                mode='markers',
+                                name='RL Suggestions',
+                                marker=dict(color='red', size=12, symbol='star')
+                            ))
+                            
+                            fig.update_layout(
+                                title="RL Suggestions vs Historical Data",
+                                xaxis_title=keys[0].replace('_', ' ').title(),
+                                yaxis_title=keys[1].replace('_', ' ').title()
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
     
-   # ========================================================================
-    # Tab 6: Supervised Learning - COMPLETELY REWRITTEN with error handling
+    # ========================================================================
+    # Tab 6: Supervised Learning - FIXED with proper data handling
     # ========================================================================
     with qd_tabs[5]:
         st.markdown("### 📈 Supervised Learning for Property Prediction")
@@ -2030,33 +2090,13 @@ def display_quantum_dots_tab(uploaded_file):
         </div>
         """, unsafe_allow_html=True)
         
-        # First, check if scikit-learn is available
+        # Check if scikit-learn is available
         try:
             import sklearn
             sklearn_available = True
-            st.sidebar.success(f"✅ scikit-learn {sklearn.__version__} available")
         except ImportError:
             sklearn_available = False
             st.error("❌ scikit-learn is not installed. Please install it with: pip install scikit-learn")
-            st.stop()
-        
-        # Now try to import the specific classes we need
-        try:
-            from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-            from sklearn.tree import DecisionTreeRegressor
-            from sklearn.linear_model import LinearRegression, Ridge, Lasso
-            from sklearn.svm import SVR
-            from sklearn.neural_network import MLPRegressor
-            from sklearn.model_selection import train_test_split, cross_val_score
-            from sklearn.preprocessing import StandardScaler
-            from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-            imports_successful = True
-        except ImportError as e:
-            st.error(f"Failed to import scikit-learn classes: {str(e)}")
-            st.info("Please ensure scikit-learn is properly installed")
-            imports_successful = False
-        
-        if not imports_successful:
             st.stop()
         
         col1, col2 = st.columns(2)
@@ -2075,13 +2115,14 @@ def display_quantum_dots_tab(uploaded_file):
                 st.warning("No numeric columns available for prediction")
                 target_var = None
             
+            # Get available numeric features
             if qd_type == "CIS-Te/ZnS":
                 default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
             else:
                 default_features = [c for c in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
                                   if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:4]
             
-            # Filter feature variables to only include columns that exist and are numeric
+            # Filter feature variables to only include numeric columns
             available_features = [c for c in data.columns if c != target_var and pd.api.types.is_numeric_dtype(data[c])]
             
             if len(available_features) == 0:
@@ -2111,13 +2152,18 @@ def display_quantum_dots_tab(uploaded_file):
                 st.metric("Samples", len(data))
                 st.metric("Features", len(feature_vars))
                 
-                # Show correlation with target
+                # Show correlation with target (only numeric)
                 correlations = []
                 for feat in feature_vars:
                     if feat in data.columns and target_var in data.columns:
                         try:
-                            corr = data[feat].corr(data[target_var])
-                            correlations.append(f"{feat}: {corr:.3f}")
+                            # Convert to numeric if needed
+                            x_vals = pd.to_numeric(data[feat], errors='coerce')
+                            y_vals = pd.to_numeric(data[target_var], errors='coerce')
+                            mask = ~(x_vals.isna() | y_vals.isna())
+                            if mask.sum() > 1:
+                                corr = x_vals[mask].corr(y_vals[mask])
+                                correlations.append(f"{feat}: {corr:.3f}")
                         except:
                             pass
                 
@@ -2128,177 +2174,175 @@ def display_quantum_dots_tab(uploaded_file):
         
         if feature_vars and target_var and st.button("🚀 Train Models", use_container_width=True):
             with st.spinner("Training supervised learning models..."):
+                try:
+                    # Import required classes
+                    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+                    from sklearn.svm import SVR
+                    from sklearn.tree import DecisionTreeRegressor
+                    from sklearn.linear_model import LinearRegression, Ridge, Lasso
+                    from sklearn.model_selection import train_test_split, cross_val_score
+                    from sklearn.preprocessing import StandardScaler
+                    from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+                except ImportError as e:
+                    st.error(f"Failed to import ML libraries: {str(e)}")
+                    st.stop()
                 
-                # Prepare data
+                # Prepare data - ensure all numeric
                 X = data[feature_vars].copy()
                 y = data[target_var].copy()
                 
-                # Ensure all data is numeric
+                # Convert all columns to numeric
                 for col in X.columns:
                     if not pd.api.types.is_numeric_dtype(X[col]):
-                        # Convert categorical to numeric if possible
-                        try:
-                            X[col] = pd.to_numeric(X[col], errors='coerce')
-                        except:
-                            # If can't convert, drop the column
-                            X = X.drop(columns=[col])
-                            if col in feature_vars:
-                                feature_vars.remove(col)
+                        X[col] = pd.to_numeric(X[col], errors='coerce')
                 
-                # Drop any rows with NaN
-                valid_idx = ~(X.isna().any(axis=1) | y.isna())
-                X = X[valid_idx]
-                y = y[valid_idx]
+                y = pd.to_numeric(y, errors='coerce')
+                
+                # Drop rows with NaN
+                valid_mask = ~(X.isna().any(axis=1) | y.isna())
+                X = X[valid_mask]
+                y = y[valid_mask]
                 
                 if len(X) < 10:
-                    st.error("Not enough valid data points after cleaning (need at least 10)")
+                    st.error(f"Not enough valid data points after cleaning (found {len(X)}). Need at least 10.")
                 else:
-                    # Train models - create dictionary with imported classes
-                    model_dict = {}
+                    # Split data
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
                     
-                    # Explicitly create each model with error handling
+                    # Scale features
+                    scaler = StandardScaler()
+                    X_train_scaled = scaler.fit_transform(X_train)
+                    X_test_scaled = scaler.transform(X_test)
+                    
+                    # Train models
+                    model_dict = {}
+                    results = {}
+                    
                     for name in model_types:
                         try:
                             if name == "Linear Regression":
-                                model_dict[name] = LinearRegression()
+                                model = LinearRegression()
                             elif name == "Ridge Regression":
-                                model_dict[name] = Ridge(alpha=1.0)
+                                model = Ridge(alpha=1.0)
                             elif name == "Lasso Regression":
-                                model_dict[name] = Lasso(alpha=0.01)
+                                model = Lasso(alpha=0.01)
                             elif name == "Decision Tree":
-                                model_dict[name] = DecisionTreeRegressor(max_depth=5, random_state=42)
+                                model = DecisionTreeRegressor(max_depth=5, random_state=42)
                             elif name == "Random Forest":
-                                # Explicit import inside the loop as a fallback
-                                try:
-                                    from sklearn.ensemble import RandomForestRegressor
-                                    model_dict[name] = RandomForestRegressor(n_estimators=100, random_state=42)
-                                except ImportError as e:
-                                    st.warning(f"Could not import RandomForestRegressor: {e}")
-                                    continue
+                                model = RandomForestRegressor(n_estimators=100, random_state=42)
                             elif name == "Gradient Boosting":
-                                try:
-                                    from sklearn.ensemble import GradientBoostingRegressor
-                                    model_dict[name] = GradientBoostingRegressor(n_estimators=100, random_state=42)
-                                except ImportError as e:
-                                    st.warning(f"Could not import GradientBoostingRegressor: {e}")
-                                    continue
+                                model = GradientBoostingRegressor(n_estimators=100, random_state=42)
                             elif name == "SVR":
-                                model_dict[name] = SVR(kernel='rbf', C=100, gamma=0.1)
+                                model = SVR(kernel='rbf', C=100, gamma=0.1)
+                            else:
+                                continue
+                            
+                            # Train
+                            model.fit(X_train_scaled, y_train)
+                            y_pred = model.predict(X_test_scaled)
+                            
+                            # Calculate metrics
+                            r2 = r2_score(y_test, y_pred)
+                            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                            mae = mean_absolute_error(y_test, y_pred)
+                            
+                            # Cross-validation (use min of 5 or number of samples)
+                            cv_folds = min(5, len(X_train_scaled))
+                            if cv_folds >= 2:
+                                cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=cv_folds, scoring='r2')
+                                cv_mean = cv_scores.mean()
+                                cv_std = cv_scores.std()
+                            else:
+                                cv_mean = r2
+                                cv_std = 0
+                            
+                            results[name] = {
+                                'model': model,
+                                'r2': r2,
+                                'rmse': rmse,
+                                'mae': mae,
+                                'cv_mean': cv_mean,
+                                'cv_std': cv_std
+                            }
+                            
+                            # Store feature importance if available
+                            if hasattr(model, 'feature_importances_'):
+                                results[name]['feature_importance'] = model.feature_importances_
+                            elif hasattr(model, 'coef_'):
+                                results[name]['feature_importance'] = np.abs(model.coef_)
+                                
                         except Exception as e:
-                            st.warning(f"Error creating model {name}: {str(e)}")
+                            st.warning(f"Error training {name}: {str(e)}")
                             continue
                     
-                    if len(model_dict) == 0:
-                        st.error("No models could be created. Please check your scikit-learn installation.")
-                    else:
-                        # Split data
-                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+                    if results:
+                        # Display results
+                        st.markdown("#### Model Performance Comparison")
                         
-                        # Scale features
-                        scaler = StandardScaler()
-                        X_train_scaled = scaler.fit_transform(X_train)
-                        X_test_scaled = scaler.transform(X_test)
+                        results_df = pd.DataFrame([
+                            {
+                                'Model': name,
+                                'R² Score': res['r2'],
+                                'RMSE': res['rmse'],
+                                'MAE': res['mae'],
+                                'CV Mean': res['cv_mean'],
+                                'CV Std': res['cv_std']
+                            }
+                            for name, res in results.items()
+                        ]).sort_values('R² Score', ascending=False)
                         
-                        results = {}
-                        for name, model in model_dict.items():
-                            try:
-                                model.fit(X_train_scaled, y_train)
-                                y_pred = model.predict(X_test_scaled)
-                                
-                                r2 = r2_score(y_test, y_pred)
-                                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                                mae = mean_absolute_error(y_test, y_pred)
-                                
-                                # Cross-validation
-                                cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=min(5, len(X_train_scaled)), scoring='r2')
-                                
-                                results[name] = {
-                                    'model': model,
-                                    'r2': r2,
-                                    'rmse': rmse,
-                                    'mae': mae,
-                                    'cv_mean': cv_scores.mean() if len(cv_scores) > 0 else 0,
-                                    'cv_std': cv_scores.std() if len(cv_scores) > 0 else 0
-                                }
-                                
-                                # Store feature importance if available
-                                if hasattr(model, 'feature_importances_'):
-                                    results[name]['feature_importance'] = model.feature_importances_
-                                elif hasattr(model, 'coef_'):
-                                    results[name]['feature_importance'] = np.abs(model.coef_)
-                                    
-                            except Exception as e:
-                                st.warning(f"Error training {name}: {str(e)}")
-                                continue
+                        st.dataframe(results_df, use_container_width=True)
                         
-                        if results:
-                            # Display results
-                            st.markdown("#### Model Performance Comparison")
-                            
-                            results_df = pd.DataFrame([
-                                {
-                                    'Model': name,
-                                    'R² Score': res['r2'],
-                                    'RMSE': res['rmse'],
-                                    'MAE': res['mae'],
-                                    'CV Mean': res['cv_mean'],
-                                    'CV Std': res['cv_std']
-                                }
-                                for name, res in results.items()
-                            ]).sort_values('R² Score', ascending=False)
-                            
-                            st.dataframe(results_df, use_container_width=True)
-                            
-                            # Plot comparison
-                            fig = go.Figure()
+                        # Plot comparison
+                        fig = go.Figure()
+                        fig.add_trace(go.Bar(
+                            x=results_df['Model'],
+                            y=results_df['R² Score'],
+                            name='R² Score',
+                            marker_color='lightblue'
+                        ))
+                        if results_df['RMSE'].max() > 0:
                             fig.add_trace(go.Bar(
                                 x=results_df['Model'],
-                                y=results_df['R² Score'],
-                                name='R² Score',
-                                marker_color='lightblue'
+                                y=results_df['RMSE'] / results_df['RMSE'].max(),
+                                name='Normalized RMSE',
+                                marker_color='lightcoral',
+                                opacity=0.7
                             ))
-                            if results_df['RMSE'].max() > 0:
-                                fig.add_trace(go.Bar(
-                                    x=results_df['Model'],
-                                    y=results_df['RMSE'] / results_df['RMSE'].max(),
-                                    name='Normalized RMSE',
-                                    marker_color='lightcoral',
-                                    opacity=0.7
-                                ))
-                            fig.update_layout(
-                                title="Model Performance Comparison",
-                                xaxis_title="Model",
-                                yaxis_title="Score",
-                                barmode='group',
-                                height=400
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+                        fig.update_layout(
+                            title="Model Performance Comparison",
+                            xaxis_title="Model",
+                            yaxis_title="Score",
+                            barmode='group',
+                            height=400
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Feature importance for best model
+                        best_model = results_df.iloc[0]['Model']
+                        if best_model in results and 'feature_importance' in results[best_model]:
+                            importance = results[best_model]['feature_importance']
                             
-                            # Feature importance for best model
-                            best_model = results_df.iloc[0]['Model']
-                            if best_model in results and 'feature_importance' in results[best_model]:
-                                importance = results[best_model]['feature_importance']
-                                
-                                # Ensure importance length matches feature_vars
-                                if len(importance) >= len(feature_vars):
-                                    importance_display = importance[:len(feature_vars)]
-                                else:
-                                    importance_display = np.pad(importance, (0, len(feature_vars) - len(importance)), 'constant')
-                                
-                                fig2 = go.Figure()
-                                fig2.add_trace(go.Bar(
-                                    x=feature_vars,
-                                    y=importance_display,
-                                    name='Feature Importance',
-                                    marker_color='green'
-                                ))
-                                fig2.update_layout(
-                                    title=f"Feature Importance ({best_model})",
-                                    xaxis_title="Feature",
-                                    yaxis_title="Importance",
-                                    height=300
-                                )
-                                st.plotly_chart(fig2, use_container_width=True)
+                            # Ensure importance length matches feature_vars
+                            if len(importance) >= len(feature_vars):
+                                importance_display = importance[:len(feature_vars)]
+                            else:
+                                importance_display = np.pad(importance, (0, len(feature_vars) - len(importance)), 'constant')
+                            
+                            fig2 = go.Figure()
+                            fig2.add_trace(go.Bar(
+                                x=feature_vars,
+                                y=importance_display,
+                                name='Feature Importance',
+                                marker_color='green'
+                            ))
+                            fig2.update_layout(
+                                title=f"Feature Importance ({best_model})",
+                                xaxis_title="Feature",
+                                yaxis_title="Importance",
+                                height=300
+                            )
+                            st.plotly_chart(fig2, use_container_width=True)
 
     
     # ========================================================================
