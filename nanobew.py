@@ -1913,9 +1913,9 @@ def display_quantum_dots_tab(uploaded_file):
             else:
                 st.info("Please select parameters with numeric data in the left panel")
     
-    # ============================================================================
+    # ========================================================================
     # Tab 5: Reinforcement Learning - FIXED with proper data handling
-    # ============================================================================
+    # ========================================================================
     with qd_tabs[4]:
         st.markdown("### 🤖 Reinforcement Learning for Adaptive Experimentation")
         
@@ -1982,12 +1982,31 @@ def display_quantum_dots_tab(uploaded_file):
                 else:
                     # Create cleaned dataframe with only numeric columns
                     clean_cols = list(factor_ranges.keys()) + [target_property]
+                    
+                    # Ensure all columns exist in data
+                    existing_cols = [col for col in clean_cols if col in data.columns]
+                    if len(existing_cols) < len(clean_cols):
+                        missing = set(clean_cols) - set(existing_cols)
+                        st.warning(f"Missing columns: {missing}. Using available columns.")
+                        clean_cols = existing_cols
+                    
+                    # Select only existing columns
                     cleaned_df = data[clean_cols].copy()
                     
-                    # Ensure all columns are numeric
-                    for col in clean_cols:
-                        if not pd.api.types.is_numeric_dtype(cleaned_df[col]):
-                            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+                    # Convert to numeric safely
+                    for col in cleaned_df.columns:
+                        try:
+                            # Check if it's a Series before conversion
+                            if isinstance(cleaned_df[col], pd.Series):
+                                cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+                            else:
+                                # If it's a scalar or other type, convert to Series first
+                                cleaned_df[col] = pd.to_numeric(pd.Series(cleaned_df[col]), errors='coerce')
+                        except Exception as e:
+                            st.warning(f"Could not convert column {col} to numeric: {str(e)}")
+                            cleaned_df = cleaned_df.drop(columns=[col])
+                            if col in factor_ranges:
+                                del factor_ranges[col]
                     
                     # Drop rows with NaN values
                     cleaned_df = cleaned_df.dropna().reset_index(drop=True)
@@ -1995,86 +2014,96 @@ def display_quantum_dots_tab(uploaded_file):
                     if len(cleaned_df) < 5:
                         st.warning(f"Not enough clean data points for RL (found {len(cleaned_df)}). Need at least 5.")
                     else:
-                        # Initialize RL agent
-                        state_size = len(factor_ranges)
-                        action_size = 10  # Simplified - discretized actions
+                        # Update factor_ranges based on cleaned data
+                        updated_ranges = {}
+                        for param in factor_ranges.keys():
+                            if param in cleaned_df.columns:
+                                updated_ranges[param] = (float(cleaned_df[param].min()), float(cleaned_df[param].max()))
+                        factor_ranges = updated_ranges
                         
-                        if use_deep_rl and TORCH_AVAILABLE:
-                            rl_agent = QDReinforcementLearning(state_size, action_size)
+                        if len(factor_ranges) == 0:
+                            st.error("No valid numeric parameters remaining after cleaning")
                         else:
-                            rl_agent = None
-                        
-                        # Generate suggestions
-                        suggestions = []
-                        for _ in range(n_suggestions):
-                            if rl_agent:
-                                # Use cleaned dataframe for RL
-                                suggestion = rl_agent.suggest_experiment(cleaned_df, factor_ranges, target_property)
+                            # Initialize RL agent
+                            state_size = len(factor_ranges)
+                            action_size = 10  # Simplified - discretized actions
+                            
+                            if use_deep_rl and TORCH_AVAILABLE:
+                                rl_agent = QDReinforcementLearning(state_size, action_size)
                             else:
-                                # Simple random perturbation of best point
-                                if pd.api.types.is_numeric_dtype(cleaned_df[target_property]):
-                                    best_idx = cleaned_df[target_property].idxmax()
+                                rl_agent = None
+                            
+                            # Generate suggestions
+                            suggestions = []
+                            for _ in range(n_suggestions):
+                                if rl_agent:
+                                    # Use cleaned dataframe for RL
+                                    suggestion = rl_agent.suggest_experiment(cleaned_df, factor_ranges, target_property)
                                 else:
-                                    best_idx = 0
+                                    # Simple random perturbation of best point
+                                    if pd.api.types.is_numeric_dtype(cleaned_df[target_property]):
+                                        best_idx = cleaned_df[target_property].idxmax()
+                                    else:
+                                        best_idx = 0
+                                    
+                                    best_params = {}
+                                    for param in factor_ranges.keys():
+                                        if param in cleaned_df.columns:
+                                            best_params[param] = cleaned_df.loc[best_idx, param]
+                                    
+                                    suggestion = {}
+                                    for param, (low, high) in factor_ranges.items():
+                                        # Add exploration noise
+                                        noise = np.random.normal(0, (high - low) * exploration_rate)
+                                        value = best_params.get(param, (low + high)/2) + noise
+                                        suggestion[param] = np.clip(value, low, high)
                                 
-                                best_params = {}
-                                for param in factor_ranges.keys():
-                                    if param in cleaned_df.columns:
-                                        best_params[param] = cleaned_df.loc[best_idx, param]
-                                
-                                suggestion = {}
-                                for param, (low, high) in factor_ranges.items():
-                                    # Add exploration noise
-                                    noise = np.random.normal(0, (high - low) * exploration_rate)
-                                    value = best_params.get(param, (low + high)/2) + noise
-                                    suggestion[param] = np.clip(value, low, high)
+                                suggestions.append(suggestion)
                             
-                            suggestions.append(suggestion)
-                        
-                        # Display suggestions
-                        suggestion_df = pd.DataFrame(suggestions)
-                        st.success(f"✅ Generated {len(suggestion_df)} experiment suggestions")
-                        st.dataframe(suggestion_df, use_container_width=True)
-                        
-                        # Download suggestions
-                        csv = suggestion_df.to_csv(index=False)
-                        st.download_button(
-                            label="📥 Download Suggestions",
-                            data=csv,
-                            file_name=f"rl_suggestions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv"
-                        )
-                        
-                        # Visualize suggestions vs history
-                        if len(factor_ranges) >= 2:
-                            keys = list(factor_ranges.keys())
-                            fig = go.Figure()
+                            # Display suggestions
+                            suggestion_df = pd.DataFrame(suggestions)
+                            st.success(f"✅ Generated {len(suggestion_df)} experiment suggestions")
+                            st.dataframe(suggestion_df, use_container_width=True)
                             
-                            # Historical data (cleaned)
-                            fig.add_trace(go.Scatter(
-                                x=cleaned_df[keys[0]],
-                                y=cleaned_df[keys[1]],
-                                mode='markers',
-                                name='Historical',
-                                marker=dict(color='blue', size=8, opacity=0.5)
-                            ))
-                            
-                            # Suggestions
-                            fig.add_trace(go.Scatter(
-                                x=suggestion_df[keys[0]],
-                                y=suggestion_df[keys[1]],
-                                mode='markers',
-                                name='RL Suggestions',
-                                marker=dict(color='red', size=12, symbol='star')
-                            ))
-                            
-                            fig.update_layout(
-                                title="RL Suggestions vs Historical Data",
-                                xaxis_title=keys[0].replace('_', ' ').title(),
-                                yaxis_title=keys[1].replace('_', ' ').title()
+                            # Download suggestions
+                            csv = suggestion_df.to_csv(index=False)
+                            st.download_button(
+                                label="📥 Download Suggestions",
+                                data=csv,
+                                file_name=f"rl_suggestions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv"
                             )
                             
-                            st.plotly_chart(fig, use_container_width=True)
+                            # Visualize suggestions vs history
+                            if len(factor_ranges) >= 2:
+                                keys = list(factor_ranges.keys())
+                                fig = go.Figure()
+                                
+                                # Historical data (cleaned)
+                                fig.add_trace(go.Scatter(
+                                    x=cleaned_df[keys[0]],
+                                    y=cleaned_df[keys[1]],
+                                    mode='markers',
+                                    name='Historical',
+                                    marker=dict(color='blue', size=8, opacity=0.5)
+                                ))
+                                
+                                # Suggestions
+                                fig.add_trace(go.Scatter(
+                                    x=suggestion_df[keys[0]],
+                                    y=suggestion_df[keys[1]],
+                                    mode='markers',
+                                    name='RL Suggestions',
+                                    marker=dict(color='red', size=12, symbol='star')
+                                ))
+                                
+                                fig.update_layout(
+                                    title="RL Suggestions vs Historical Data",
+                                    xaxis_title=keys[0].replace('_', ' ').title(),
+                                    yaxis_title=keys[1].replace('_', ' ').title()
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True)
                             
     
     # ========================================================================
