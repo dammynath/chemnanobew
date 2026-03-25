@@ -3072,217 +3072,255 @@ def display_multi_objective_tab():
         st.plotly_chart(fig)
 
 
-# ============================================================================
-# Tab 4: Molecular Generator 
-# ============================================================================
-
 def display_molecular_generator_tab():
-    """Molecular generator tab with RDKit integration"""
+    """Molecular generator tab with REINVENT4 integration"""
     st.markdown("<h2 class='sub-header'>🧬 Porphyrin Molecular Generator</h2>", unsafe_allow_html=True)
     
-    # Try to import RDKit properly
-    global RDKIT_AVAILABLE
-    global Chem
-    global Draw
-    global Descriptors
-    global rdMolDescriptors
+    # Check REINVENT4 availability
+    reinvent = REINVENT4Wrapper()
+    reinvent_available = reinvent.check_installation()
     
-    try:
-        from rdkit import Chem
-        from rdkit.Chem import Draw, Descriptors, rdMolDescriptors
-        RDKIT_AVAILABLE = True
-        st.sidebar.success("✅ RDKit available")
-    except ImportError:
-        RDKIT_AVAILABLE = False
-        Chem = None
-        Draw = None
-        Descriptors = None
-        rdMolDescriptors = None
-        st.warning("⚠️ RDKit not available - showing SMILES only")
+    if not reinvent_available:
+        st.warning("⚠️ REINVENT4 not installed. Using basic generator.")
+        # Fall back to basic MolecularUtils generator
+        display_basic_generator()
+        return
     
-    if not RDKIT_AVAILABLE:
-        st.warning("⚠️ RDKit is not available. Molecular visualization will be limited to SMILES strings.")
+    # Create tabs for different REINVENT4 modes
+    mode_tabs = st.tabs([
+        "🎨 De Novo Design",
+        "🔁 Scaffold Hopping",
+        "🎯 R-Group Replacement",
+        "📊 Results"
+    ])
     
+    # ========================================================================
+    # Tab 1: De Novo Design
+    # ========================================================================
+    with mode_tabs[0]:
+        st.markdown("### 🎨 De Novo Porphyrin Design")
+        
+        st.markdown("""
+        <div class='info-box'>
+        Generate novel porphyrin structures from scratch using REINVENT4's Reinforcement Learning algorithm.
+        Define target optical properties to guide the generation.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Optical Property Targets")
+            target_abs = st.number_input("Target Absorbance (nm)", 350, 800, 420, step=5, key="reinvent_abs")
+            target_fluor = st.number_input("Target Fluorescence (nm)", 500, 900, 650, step=5, key="reinvent_fluor")
+            target_qy = st.number_input("Target Quantum Yield", 0.0, 1.0, 0.5, step=0.05, key="reinvent_qy")
+        
+        with col2:
+            st.markdown("#### Generation Settings")
+            num_molecules = st.number_input("Number of Molecules", 10, 1000, 100, key="reinvent_n")
+            device = st.selectbox("Compute Device", ["cpu", "cuda", "rocm"], key="reinvent_device")
+            reinvent.device = device
+            
+            st.markdown("#### Prior Model")
+            prior_model = st.selectbox(
+                "Prior Model",
+                ["reinvent.prior", "porphyrin_prior.prior", "custom.prior"],
+                key="reinvent_prior"
+            )
+            reinvent.prior_model = f"priors/{prior_model}"
+        
+        if st.button("🚀 Generate Novel Porphyrins", use_container_width=True, type="primary"):
+            with st.spinner("REINVENT4 generating molecules..."):
+                config = reinvent.create_porphyrin_config(
+                    target_absorbance=target_abs,
+                    target_fluorescence=target_fluor,
+                    target_qy=target_qy,
+                    num_molecules=num_molecules
+                )
+                
+                results = reinvent.run_reinvent(config)
+                
+                if results is not None:
+                    st.session_state['reinvent_results'] = results
+                    st.success(f"✅ Generated {len(results)} molecules")
+                    
+                    # Display preview
+                    st.dataframe(results.head(10), use_container_width=True)
+    
+    # ========================================================================
+    # Tab 2: Scaffold Hopping
+    # ========================================================================
+    with mode_tabs[1]:
+        st.markdown("### 🔁 Scaffold Hopping")
+        
+        st.markdown("""
+        <div class='info-box'>
+        Modify existing porphyrin scaffold while preserving core structure.
+        Generate novel variants with improved optical properties.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            base_scaffold = st.text_input(
+                "Base Scaffold SMILES",
+                value="C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2",
+                key="scaffold_smiles"
+            )
+            
+            if base_scaffold:
+                from rdkit import Chem
+                mol = Chem.MolFromSmiles(base_scaffold)
+                if mol:
+                    st.image(Draw.MolToImage(mol, size=(200, 200)), caption="Base Scaffold")
+        
+        with col2:
+            target_abs_scaffold = st.number_input("Target Absorbance (nm)", 350, 800, 420, step=5, key="scaffold_abs")
+            target_fluor_scaffold = st.number_input("Target Fluorescence (nm)", 500, 900, 650, step=5, key="scaffold_fluor")
+            num_variants = st.number_input("Number of Variants", 10, 500, 50, key="scaffold_n")
+        
+        if st.button("🎯 Generate Scaffold Variants", use_container_width=True):
+            with st.spinner("REINVENT4 performing scaffold hopping..."):
+                config = reinvent.create_porphyrin_config(
+                    target_absorbance=target_abs_scaffold,
+                    target_fluorescence=target_fluor_scaffold,
+                    num_molecules=num_variants,
+                    scaffold_smiles=base_scaffold
+                )
+                config["run_type"] = "libinvent"  # Library invention mode
+                
+                results = reinvent.run_reinvent(config)
+                
+                if results is not None:
+                    st.session_state['reinvent_results'] = results
+                    st.success(f"✅ Generated {len(results)} scaffold variants")
+    
+    # ========================================================================
+    # Tab 3: R-Group Replacement
+    # ========================================================================
+    with mode_tabs[2]:
+        st.markdown("### 🎯 R-Group Replacement")
+        
+        st.markdown("""
+        <div class='info-box'>
+        Optimize substituents on porphyrin scaffold to improve optical properties.
+        Systematically explore R-group space for enhanced performance.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            core_smiles = st.text_input(
+                "Core SMILES with R-group markers",
+                value="C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2",
+                key="core_smiles",
+                help="Use '*' to mark R-group positions"
+            )
+            
+            r_groups = st.text_area(
+                "R-group Options (SMILES, one per line)",
+                value="C\nCC\nc1ccccc1\nCO\nN\nBr",
+                key="r_groups"
+            ).split('\n')
+        
+        with col2:
+            target_abs_r = st.number_input("Target Absorbance (nm)", 350, 800, 420, step=5, key="r_abs")
+            target_fluor_r = st.number_input("Target Fluorescence (nm)", 500, 900, 650, step=5, key="r_fluor")
+            num_combinations = st.number_input("Number of Combinations", 10, 500, 50, key="r_n")
+        
+        if st.button("🔬 Optimize R-Groups", use_container_width=True):
+            with st.spinner("REINVENT4 optimizing R-groups..."):
+                # R-group replacement mode
+                config = reinvent.create_porphyrin_config(
+                    target_absorbance=target_abs_r,
+                    target_fluorescence=target_fluor_r,
+                    num_molecules=num_combinations
+                )
+                config["run_type"] = "linkinvent"  # Linker/R-group mode
+                config["r_groups"] = r_groups
+                config["core_smiles"] = core_smiles
+                
+                results = reinvent.run_reinvent(config)
+                
+                if results is not None:
+                    st.session_state['reinvent_results'] = results
+                    st.success(f"✅ Generated {len(results)} R-group combinations")
+    
+    # ========================================================================
+    # Tab 4: Results
+    # ========================================================================
+    with mode_tabs[3]:
+        st.markdown("### 📊 Generated Molecules")
+        
+        if 'reinvent_results' in st.session_state:
+            df = st.session_state['reinvent_results']
+            
+            # Display results
+            st.dataframe(df, use_container_width=True)
+            
+            # Property distributions
+            if 'score' in df.columns:
+                fig = go.Figure()
+                fig.add_trace(go.Histogram(x=df['score'], nbinsx=30, name='Score Distribution'))
+                fig.update_layout(title="Generated Molecules Score Distribution")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Top molecules
+            if 'smiles' in df.columns:
+                st.markdown("### 🏆 Top Performing Molecules")
+                
+                # Sort by score if available
+                if 'score' in df.columns:
+                    top_df = df.nlargest(10, 'score')
+                else:
+                    top_df = df.head(10)
+                
+                for i, row in top_df.iterrows():
+                    with st.expander(f"Molecule {i+1}: {row['smiles'][:50]}..."):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.code(row['smiles'], language="text")
+                        with col2:
+                            # Show properties
+                            for col in df.columns:
+                                if col != 'smiles':
+                                    st.metric(col, f"{row[col]:.4f}" if isinstance(row[col], (int, float)) else str(row[col]))
+            
+            # Download results
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download All Generated Molecules",
+                data=csv,
+                file_name=f"reinvent_porphyrins_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("Run one of the generation modes above to see results.")
+
+def display_basic_generator():
+    """Fallback basic molecular generator"""
     utils = MolecularUtils()
     
-    # Input parameters
-    col1, col2 = st.columns(2)
+    n_mols = st.slider("Number of molecules", 5, 50, 10)
     
-    with col1:
-        st.markdown("### Generation Parameters")
-        n_mols = st.slider("Number of molecules", 5, 50, 10)
-        temperature = st.slider("Generation temperature", 0.5, 2.0, 1.0, 0.1)
-        
-        property_constraints = st.multiselect(
-            "Property constraints",
-            ['Molecular Weight < 1000', 'LogP < 5', 'HBA < 10', 'HBD < 5', 'QED > 0.5'],
-            default=['QED > 0.5']
-        )
-        
-        # Optical property targets
-        st.markdown("### Optical Property Targets")
-        target_abs = st.number_input("Target Absorbance (nm)", 350, 800, 420, step=5)
-        target_fluor = st.number_input("Target Fluorescence (nm)", 500, 900, 650, step=5)
-        target_qy = st.number_input("Target Quantum Yield", 0.0, 1.0, 0.5, step=0.05)
-    
-    with col2:
-        st.markdown("### Base Porphyrin Structure")
-        
-        # Display base porphyrin structure if RDKit available
-        if RDKIT_AVAILABLE and Chem:
-            base_smiles = "C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2"
-            try:
-                base_mol = Chem.MolFromSmiles(base_smiles)
-                if base_mol:
-                    # Create a simple image using RDKit
-                    img = Draw.MolToImage(base_mol, size=(250, 250))
-                    st.image(img, caption="Porphyrin Core Structure")
-                else:
-                    st.markdown("""
-					NH N
-	/ \ /
-	| |
-	\ / \
-	N HN
-	""")
-	except Exception as e:
-	st.markdown("""
-	NH N
-	/ \ /
-	| |
-	\ / \
-	N HN
-	""")
-	
-	if st.button("🎯 Generate Novel Porphyrins", use_container_width=True, type="primary"):
-	with st.spinner("Generating novel porphyrin structures..."):
-	# Generate molecules
-	smiles_list = utils.generate_porphyrin_variants(n_mols)
-	
-	# Calculate properties for each molecule
-	molecules_data = []
-	valid_molecules = []
-	valid_smiles = []
-	
-	for smiles in smiles_list:
-	    # Calculate properties
-	    properties = utils.estimate_properties(smiles)
-	    if properties:
-	        # Apply constraints
-	        valid = True
-	        if 'Molecular Weight < 1000' in property_constraints:
-	            valid = valid and properties['molecular_weight'] < 1000
-	        if 'LogP < 5' in property_constraints:
-	            valid = valid and properties['logP'] < 5
-	        if 'HBA < 10' in property_constraints:
-	            valid = valid and properties['hba'] < 10
-	        if 'HBD < 5' in property_constraints:
-	            valid = valid and properties['hbd'] < 5
-	        if 'QED > 0.5' in property_constraints:
-	            valid = valid and properties['qed'] > 0.5
-	        
-	        if valid:
-	            # Estimate optical properties
-	            abs_wl = target_abs + np.random.normal(0, 15)
-	            fluor_wl = target_fluor + np.random.normal(0, 20)
-	            qy = target_qy + np.random.normal(0, 0.05)
-	            qy = max(0, min(1, qy))
-	            
-	            properties['smiles'] = smiles
-	            properties['absorbance_nm'] = abs_wl
-	            properties['fluorescence_nm'] = fluor_wl
-	            properties['quantum_yield'] = qy
-	            molecules_data.append(properties)
-	            valid_smiles.append(smiles)
-	            
-	            if RDKIT_AVAILABLE and Chem:
-	                mol = Chem.MolFromSmiles(smiles)
-	                if mol:
-	                    valid_molecules.append(mol)
-	
-	if molecules_data:
-	    st.success(f"✅ Generated {len(molecules_data)} valid molecules meeting constraints")
-	    
-	    # Display molecules grid if RDKit available
-	    if RDKIT_AVAILABLE and Draw and valid_molecules:
-	        try:
-	            # Create grid image
-	            img = Draw.MolsToGridImage(
-	                valid_molecules[:min(9, len(valid_molecules))],
-	                molsPerRow=3,
-	                subImgSize=(200, 200),
-	                legends=[f"Mol {i+1}" for i in range(min(9, len(valid_molecules)))]
-	            )
-	            st.image(img, use_container_width=True)
-	        except Exception as e:
-	            st.warning(f"Could not generate molecule images: {str(e)}")
-	            # Fallback to text display
-	            for i, smiles in enumerate(valid_smiles[:9]):
-	                with st.expander(f"Molecule {i+1}"):
-	                    st.code(smiles)
-	                    props = molecules_data[i]
-	                    col1, col2, col3 = st.columns(3)
-	                    with col1:
-	                        st.metric("Absorbance", f"{props['absorbance_nm']:.0f} nm")
-	                    with col2:
-	                        st.metric("Fluorescence", f"{props['fluorescence_nm']:.0f} nm")
-	                    with col3:
-	                        st.metric("Quantum Yield", f"{props['quantum_yield']:.3f}")
-	    
-	    # Display properties table
-	    st.markdown("### 📊 Molecular Properties")
-	    molecules_df = pd.DataFrame(molecules_data)
-	    
-	    # Select columns to display
-	    display_cols = ['smiles', 'molecular_weight', 'logP', 'qed', 'absorbance_nm', 'fluorescence_nm', 'quantum_yield']
-	    available_cols = [col for col in display_cols if col in molecules_df.columns]
-	    st.dataframe(molecules_df[available_cols], use_container_width=True)
-	    
-	    # Property distribution plots
-	    st.markdown("### 📈 Property Distributions")
-	    
-	    fig = make_subplots(
-	        rows=2, cols=2,
-	        subplot_titles=('Molecular Weight', 'LogP', 'QED', 'Absorbance (nm)')
-	    )
-	    
-	    if 'molecular_weight' in molecules_df.columns:
-	        fig.add_trace(
-	            go.Histogram(x=molecules_df['molecular_weight'], nbinsx=20, name='MW'),
-	            row=1, col=1
-	        )
-	    
-	    if 'logP' in molecules_df.columns:
-	        fig.add_trace(
-	            go.Histogram(x=molecules_df['logP'], nbinsx=20, name='LogP'),
-	            row=1, col=2
-	        )
-	    
-	    if 'qed' in molecules_df.columns:
-	        fig.add_trace(
-	            go.Histogram(x=molecules_df['qed'], nbinsx=20, name='QED'),
-	            row=2, col=1
-	        )
-	    
-	    if 'absorbance_nm' in molecules_df.columns:
-	        fig.add_trace(
-	            go.Histogram(x=molecules_df['absorbance_nm'], nbinsx=20, name='Absorbance'),
-	            row=2, col=2
-	        )
-	    
-	    fig.update_layout(height=600, showlegend=False, title_text="Property Distributions")
-	    st.plotly_chart(fig, use_container_width=True)
-	    
-	    # Download generated molecules
-	    csv = molecules_df.to_csv(index=False)
-	    st.download_button(
-	        label="📥 Download Generated Molecules",
-	        data=csv,
-	        file_name=f"generated_porphyrins_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-	        mime="text/csv"
-	    )
-	else:
-	    st.warning("No molecules met the property constraints. Try adjusting constraints.")
+    if st.button("🎯 Generate Structures"):
+        with st.spinner("Generating..."):
+            smiles_list = utils.generate_porphyrin_variants(n_mols)
+            
+            st.success(f"✅ Generated {len(smiles_list)} structures")
+            
+            for i, smi in enumerate(smiles_list):
+                with st.expander(f"Molecule {i+1}"):
+                    st.code(smi)
+                    props = utils.estimate_properties(smi)
+                    if props:
+                        col1, col2, col3 = st.columns(3)
+                        items = list(props.items())
+                        for j, (k, v) in enumerate(items[:3]):
+                            with [col1, col2, col3][j]:
+                                st.metric(k.replace('_', ' ').title(), v)
 
 
 
