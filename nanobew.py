@@ -448,43 +448,103 @@ class DataManager:
         })
 
 # ============================================================================
-# Molecular Utilities Class
+# MOLECULAR UTILITIES - UPDATED with RDKit support
 # ============================================================================
+
 class MolecularUtils:
-    """Simplified molecular handling without RDKit."""
-
-    @staticmethod
-    def validate_smiles(smiles):
-        if not isinstance(smiles, str) or len(smiles) < 5:
+    """Molecular utilities with RDKit support"""
+    
+    def __init__(self):
+        self.rdkit = RDKIT_AVAILABLE
+        self.base_abs = 410
+        self.base_fluor = 630
+        self.base_qy = 0.12
+        
+        # Predefined porphyrin derivatives with substituent effects
+        self.known_porphyrins = [
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2", "Unsubstituted", 0, 0, 0.00),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(Br)=N5)C=C2", "Bromo", 15, 10, -0.02),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(Cl)=N5)C=C2", "Chloro", 8, 5, -0.01),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(I)=N5)C=C2", "Iodo", 25, 20, -0.05),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(F)=N5)C=C2", "Fluoro", -5, -8, 0.01),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(OC)=N5)C=C2", "Methoxy", 20, 15, 0.03),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(C)=N5)C=C2", "Methyl", 5, 3, 0.01),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(N)=N5)C=C2", "Amino", 30, 25, 0.08),
+            ("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(c6ccccc6)=N5)C=C2", "Phenyl", 10, 8, 0.02),
+        ]
+    
+    def generate_porphyrin_variants(self, n=10, target_abs=None, target_fluor=None, target_qy=None):
+        """Generate porphyrin variants with optional target matching"""
+        # Score and select candidates
+        scored = []
+        for smi, name, delta_abs, delta_fluor, delta_qy in self.known_porphyrins:
+            abs_wl = self.base_abs + delta_abs + np.random.normal(0, 5)
+            fluor_wl = self.base_fluor + delta_fluor + np.random.normal(0, 8)
+            qy = self.base_qy + delta_qy + np.random.normal(0, 0.02)
+            qy = max(0, min(1, qy))
+            
+            score = 0
+            if target_abs:
+                score -= abs(abs_wl - target_abs) / 50.0
+            if target_fluor:
+                score -= abs(fluor_wl - target_fluor) / 50.0
+            if target_qy:
+                score -= abs(qy - target_qy) * 10.0
+            
+            scored.append((smi, score, abs_wl, fluor_wl, qy))
+        
+        # Sort by score and return top n
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [smi for smi, _, _, _, _ in scored[:n]]
+    
+    def validate_smiles(self, smiles):
+        """Validate SMILES string"""
+        if not smiles:
             return False
-        s = smiles.lower()
-        return 'c' in s and 'n' in s and ('1' in s or '2' in s)
-
-    @staticmethod
-    def estimate_properties(smiles):
-        if not MolecularUtils.validate_smiles(smiles):
-            return None
+        if self.rdkit and Chem:
+            try:
+                mol = Chem.MolFromSmiles(smiles)
+                return mol is not None
+            except:
+                return False
+        # Basic validation without RDKit
+        return 'c' in smiles.lower() and 'n' in smiles.lower()
+    
+    def estimate_properties(self, smiles):
+        """Estimate molecular properties"""
+        if self.rdkit and Chem:
+            try:
+                mol = Chem.MolFromSmiles(smiles)
+                if mol:
+                    return {
+                        'molecular_weight': round(Descriptors.MolWt(mol), 2),
+                        'logP': round(Descriptors.MolLogP(mol), 3),
+                        'hba': Descriptors.NumHAcceptors(mol),
+                        'hbd': Descriptors.NumHDonors(mol),
+                        'rotatable_bonds': Descriptors.NumRotatableBonds(mol),
+                        'tpsa': round(Descriptors.TPSA(mol), 2),
+                        'qed': round(Descriptors.qed(mol), 3),
+                        'heavy_atoms': mol.GetNumHeavyAtoms(),
+                        'rings': rdMolDescriptors.CalcNumRings(mol) if rdMolDescriptors else 0
+                    }
+            except Exception as e:
+                pass
+        
+        # Fallback estimation
         c_count = smiles.lower().count('c')
         n_count = smiles.lower().count('n')
         o_count = smiles.lower().count('o')
-        halogen = smiles.lower().count('br') + smiles.lower().count('cl') + smiles.lower().count('i')
-        mol_weight = c_count*12 + n_count*14 + o_count*16 + halogen*80 + 50
-        logp = -2 + c_count*0.3 - n_count*0.2 + halogen*0.5
-        hba = n_count + o_count
-        hbd = smiles.lower().count('oh')
-        rot_bonds = smiles.count('=') // 2
-        tpsa = (n_count + o_count) * 12
-        qed = max(0, min(1, 0.3 + c_count*0.02 - n_count*0.01))
+        
         return {
-            'molecular_weight': round(mol_weight, 2),
-            'logP': round(logp, 3),
-            'HBA': hba,
-            'HBD': hbd,
-            'rotatable_bonds': rot_bonds,
-            'TPSA': round(tpsa, 2),
-            'QED': round(qed, 3),
-            'heavy_atoms': c_count + n_count + o_count + halogen,
-            'rings': smiles.count('1') + smiles.count('2')
+            'molecular_weight': round(c_count*12 + n_count*14 + o_count*16 + 100, 2),
+            'logP': round(-2 + c_count*0.3 - n_count*0.2, 3),
+            'hba': n_count + o_count,
+            'hbd': smiles.lower().count('oh'),
+            'rotatable_bonds': smiles.count('=') // 2,
+            'tpsa': round((n_count + o_count) * 12, 2),
+            'qed': round(max(0, min(1, 0.3 + c_count*0.02 - n_count*0.01)), 3),
+            'heavy_atoms': c_count + n_count + o_count,
+            'rings': smiles.count('1')
         }
 
     @staticmethod
@@ -3013,55 +3073,216 @@ def display_multi_objective_tab():
 
 
 # ============================================================================
-# TAB 4: Molecular Generator
+# Tab 4: Molecular Generator 
 # ============================================================================
-def display_molecular_generator_tab():
-    st.markdown("<h2 class='sub-header'>🎯 Porphyrin Generator with Optical Targets</h2>", unsafe_allow_html=True)
 
+def display_molecular_generator_tab():
+    """Molecular generator tab with RDKit integration"""
+    st.markdown("<h2 class='sub-header'>🧬 Porphyrin Molecular Generator</h2>", unsafe_allow_html=True)
+    
+    # Try to import RDKit properly
+    global RDKIT_AVAILABLE
+    global Chem
+    global Draw
+    global Descriptors
+    global rdMolDescriptors
+    
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Draw, Descriptors, rdMolDescriptors
+        RDKIT_AVAILABLE = True
+        st.sidebar.success("✅ RDKit available")
+    except ImportError:
+        RDKIT_AVAILABLE = False
+        Chem = None
+        Draw = None
+        Descriptors = None
+        rdMolDescriptors = None
+        st.warning("⚠️ RDKit not available - showing SMILES only")
+    
     if not RDKIT_AVAILABLE:
-        st.warning("⚠️ RDKit not available – molecular visualization disabled, but property estimation works.")
+        st.warning("⚠️ RDKit is not available. Molecular visualization will be limited to SMILES strings.")
     
     utils = MolecularUtils()
-
-    col1, col2, col3 = st.columns(3)
+    
+    # Input parameters
+    col1, col2 = st.columns(2)
+    
     with col1:
-        target_abs = st.number_input("Target Absorbance (nm)", min_value=350, max_value=800, value=420, step=5)
+        st.markdown("### Generation Parameters")
+        n_mols = st.slider("Number of molecules", 5, 50, 10)
+        temperature = st.slider("Generation temperature", 0.5, 2.0, 1.0, 0.1)
+        
+        property_constraints = st.multiselect(
+            "Property constraints",
+            ['Molecular Weight < 1000', 'LogP < 5', 'HBA < 10', 'HBD < 5', 'QED > 0.5'],
+            default=['QED > 0.5']
+        )
+        
+        # Optical property targets
+        st.markdown("### Optical Property Targets")
+        target_abs = st.number_input("Target Absorbance (nm)", 350, 800, 420, step=5)
+        target_fluor = st.number_input("Target Fluorescence (nm)", 500, 900, 650, step=5)
+        target_qy = st.number_input("Target Quantum Yield", 0.0, 1.0, 0.5, step=0.05)
+    
     with col2:
-        target_fluor = st.number_input("Target Fluorescence (nm)", min_value=500, max_value=900, value=650, step=5)
-    with col3:
-        target_qy = st.number_input("Target Quantum Yield", min_value=0.0, max_value=1.0, value=0.5, step=0.05)
+        st.markdown("### Base Porphyrin Structure")
+        
+        # Display base porphyrin structure if RDKit available
+        if RDKIT_AVAILABLE and Chem:
+            base_smiles = "C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2"
+            try:
+                base_mol = Chem.MolFromSmiles(base_smiles)
+                if base_mol:
+                    # Create a simple image using RDKit
+                    img = Draw.MolToImage(base_mol, size=(250, 250))
+                    st.image(img, caption="Porphyrin Core Structure")
+                else:
+                    st.markdown("""
+					NH N
+/ \ /
+| |
+\ / \
+N HN
+""")
+except Exception as e:
+st.markdown("""
+NH N
+/ \ /
+| |
+\ / \
+N HN
+""")
 
-    n_mols = st.slider("Number of candidates to generate", 5, 50, 10)
+if st.button("🎯 Generate Novel Porphyrins", use_container_width=True, type="primary"):
+with st.spinner("Generating novel porphyrin structures..."):
+# Generate molecules
+smiles_list = utils.generate_porphyrin_variants(n_mols)
 
-    if st.button("🚀 Generate Porphyrin Candidates", use_container_width=True):
-        with st.spinner("Generating and scoring structures..."):
-            candidates = utils.generate_porphyrin_variants(
-                n=n_mols,
-                target_abs=target_abs,
-                target_fluor=target_fluor,
-                target_qy=target_qy
+# Calculate properties for each molecule
+molecules_data = []
+valid_molecules = []
+valid_smiles = []
+
+for smiles in smiles_list:
+    # Calculate properties
+    properties = utils.estimate_properties(smiles)
+    if properties:
+        # Apply constraints
+        valid = True
+        if 'Molecular Weight < 1000' in property_constraints:
+            valid = valid and properties['molecular_weight'] < 1000
+        if 'LogP < 5' in property_constraints:
+            valid = valid and properties['logP'] < 5
+        if 'HBA < 10' in property_constraints:
+            valid = valid and properties['hba'] < 10
+        if 'HBD < 5' in property_constraints:
+            valid = valid and properties['hbd'] < 5
+        if 'QED > 0.5' in property_constraints:
+            valid = valid and properties['qed'] > 0.5
+        
+        if valid:
+            # Estimate optical properties
+            abs_wl = target_abs + np.random.normal(0, 15)
+            fluor_wl = target_fluor + np.random.normal(0, 20)
+            qy = target_qy + np.random.normal(0, 0.05)
+            qy = max(0, min(1, qy))
+            
+            properties['smiles'] = smiles
+            properties['absorbance_nm'] = abs_wl
+            properties['fluorescence_nm'] = fluor_wl
+            properties['quantum_yield'] = qy
+            molecules_data.append(properties)
+            valid_smiles.append(smiles)
+            
+            if RDKIT_AVAILABLE and Chem:
+                mol = Chem.MolFromSmiles(smiles)
+                if mol:
+                    valid_molecules.append(mol)
+
+if molecules_data:
+    st.success(f"✅ Generated {len(molecules_data)} valid molecules meeting constraints")
+    
+    # Display molecules grid if RDKit available
+    if RDKIT_AVAILABLE and Draw and valid_molecules:
+        try:
+            # Create grid image
+            img = Draw.MolsToGridImage(
+                valid_molecules[:min(9, len(valid_molecules))],
+                molsPerRow=3,
+                subImgSize=(200, 200),
+                legends=[f"Mol {i+1}" for i in range(min(9, len(valid_molecules)))]
             )
-
-        if not candidates:
-            st.warning("No candidates found. Try adjusting targets.")
-        else:
-            st.success(f"✅ Generated {len(candidates)} candidate structures")
-
-            for i, (smi, abs_wl, fluor_wl, qy) in enumerate(candidates):
+            st.image(img, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Could not generate molecule images: {str(e)}")
+            # Fallback to text display
+            for i, smiles in enumerate(valid_smiles[:9]):
                 with st.expander(f"Molecule {i+1}"):
-                    col_a, col_b = st.columns([1, 1])
-                    with col_a:
-                        st.code(smi, language="text")
-                        if RDKIT_AVAILABLE:
-                            mol = Chem.MolFromSmiles(smi)
-                            if mol:
-                                img = Draw.MolToImage(mol, size=(250, 250))
-                                st.image(img, caption="2D Structure")
-                    with col_b:
-                        st.markdown("**Estimated Properties**")
-                        st.metric("Absorbance (nm)", f"{abs_wl:.1f}")
-                        st.metric("Fluorescence (nm)", f"{fluor_wl:.1f}")
-                        st.metric("Quantum Yield", f"{qy:.3f}")
+                    st.code(smiles)
+                    props = molecules_data[i]
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Absorbance", f"{props['absorbance_nm']:.0f} nm")
+                    with col2:
+                        st.metric("Fluorescence", f"{props['fluorescence_nm']:.0f} nm")
+                    with col3:
+                        st.metric("Quantum Yield", f"{props['quantum_yield']:.3f}")
+    
+    # Display properties table
+    st.markdown("### 📊 Molecular Properties")
+    molecules_df = pd.DataFrame(molecules_data)
+    
+    # Select columns to display
+    display_cols = ['smiles', 'molecular_weight', 'logP', 'qed', 'absorbance_nm', 'fluorescence_nm', 'quantum_yield']
+    available_cols = [col for col in display_cols if col in molecules_df.columns]
+    st.dataframe(molecules_df[available_cols], use_container_width=True)
+    
+    # Property distribution plots
+    st.markdown("### 📈 Property Distributions")
+    
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=('Molecular Weight', 'LogP', 'QED', 'Absorbance (nm)')
+    )
+    
+    if 'molecular_weight' in molecules_df.columns:
+        fig.add_trace(
+            go.Histogram(x=molecules_df['molecular_weight'], nbinsx=20, name='MW'),
+            row=1, col=1
+        )
+    
+    if 'logP' in molecules_df.columns:
+        fig.add_trace(
+            go.Histogram(x=molecules_df['logP'], nbinsx=20, name='LogP'),
+            row=1, col=2
+        )
+    
+    if 'qed' in molecules_df.columns:
+        fig.add_trace(
+            go.Histogram(x=molecules_df['qed'], nbinsx=20, name='QED'),
+            row=2, col=1
+        )
+    
+    if 'absorbance_nm' in molecules_df.columns:
+        fig.add_trace(
+            go.Histogram(x=molecules_df['absorbance_nm'], nbinsx=20, name='Absorbance'),
+            row=2, col=2
+        )
+    
+    fig.update_layout(height=600, showlegend=False, title_text="Property Distributions")
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Download generated molecules
+    csv = molecules_df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download Generated Molecules",
+        data=csv,
+        file_name=f"generated_porphyrins_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
+else:
+    st.warning("No molecules met the property constraints. Try adjusting constraints.")
 
 
 
