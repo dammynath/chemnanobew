@@ -3140,149 +3140,149 @@ def display_molecular_generator_tab():
                 else:
                     st.markdown("""
 					NH N
-/ \ /
-| |
-\ / \
-N HN
-""")
-except Exception as e:
-st.markdown("""
-NH N
-/ \ /
-| |
-\ / \
-N HN
-""")
-
-if st.button("🎯 Generate Novel Porphyrins", use_container_width=True, type="primary"):
-with st.spinner("Generating novel porphyrin structures..."):
-# Generate molecules
-smiles_list = utils.generate_porphyrin_variants(n_mols)
-
-# Calculate properties for each molecule
-molecules_data = []
-valid_molecules = []
-valid_smiles = []
-
-for smiles in smiles_list:
-    # Calculate properties
-    properties = utils.estimate_properties(smiles)
-    if properties:
-        # Apply constraints
-        valid = True
-        if 'Molecular Weight < 1000' in property_constraints:
-            valid = valid and properties['molecular_weight'] < 1000
-        if 'LogP < 5' in property_constraints:
-            valid = valid and properties['logP'] < 5
-        if 'HBA < 10' in property_constraints:
-            valid = valid and properties['hba'] < 10
-        if 'HBD < 5' in property_constraints:
-            valid = valid and properties['hbd'] < 5
-        if 'QED > 0.5' in property_constraints:
-            valid = valid and properties['qed'] > 0.5
-        
-        if valid:
-            # Estimate optical properties
-            abs_wl = target_abs + np.random.normal(0, 15)
-            fluor_wl = target_fluor + np.random.normal(0, 20)
-            qy = target_qy + np.random.normal(0, 0.05)
-            qy = max(0, min(1, qy))
-            
-            properties['smiles'] = smiles
-            properties['absorbance_nm'] = abs_wl
-            properties['fluorescence_nm'] = fluor_wl
-            properties['quantum_yield'] = qy
-            molecules_data.append(properties)
-            valid_smiles.append(smiles)
-            
-            if RDKIT_AVAILABLE and Chem:
-                mol = Chem.MolFromSmiles(smiles)
-                if mol:
-                    valid_molecules.append(mol)
-
-if molecules_data:
-    st.success(f"✅ Generated {len(molecules_data)} valid molecules meeting constraints")
-    
-    # Display molecules grid if RDKit available
-    if RDKIT_AVAILABLE and Draw and valid_molecules:
-        try:
-            # Create grid image
-            img = Draw.MolsToGridImage(
-                valid_molecules[:min(9, len(valid_molecules))],
-                molsPerRow=3,
-                subImgSize=(200, 200),
-                legends=[f"Mol {i+1}" for i in range(min(9, len(valid_molecules)))]
-            )
-            st.image(img, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Could not generate molecule images: {str(e)}")
-            # Fallback to text display
-            for i, smiles in enumerate(valid_smiles[:9]):
-                with st.expander(f"Molecule {i+1}"):
-                    st.code(smiles)
-                    props = molecules_data[i]
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Absorbance", f"{props['absorbance_nm']:.0f} nm")
-                    with col2:
-                        st.metric("Fluorescence", f"{props['fluorescence_nm']:.0f} nm")
-                    with col3:
-                        st.metric("Quantum Yield", f"{props['quantum_yield']:.3f}")
-    
-    # Display properties table
-    st.markdown("### 📊 Molecular Properties")
-    molecules_df = pd.DataFrame(molecules_data)
-    
-    # Select columns to display
-    display_cols = ['smiles', 'molecular_weight', 'logP', 'qed', 'absorbance_nm', 'fluorescence_nm', 'quantum_yield']
-    available_cols = [col for col in display_cols if col in molecules_df.columns]
-    st.dataframe(molecules_df[available_cols], use_container_width=True)
-    
-    # Property distribution plots
-    st.markdown("### 📈 Property Distributions")
-    
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=('Molecular Weight', 'LogP', 'QED', 'Absorbance (nm)')
-    )
-    
-    if 'molecular_weight' in molecules_df.columns:
-        fig.add_trace(
-            go.Histogram(x=molecules_df['molecular_weight'], nbinsx=20, name='MW'),
-            row=1, col=1
-        )
-    
-    if 'logP' in molecules_df.columns:
-        fig.add_trace(
-            go.Histogram(x=molecules_df['logP'], nbinsx=20, name='LogP'),
-            row=1, col=2
-        )
-    
-    if 'qed' in molecules_df.columns:
-        fig.add_trace(
-            go.Histogram(x=molecules_df['qed'], nbinsx=20, name='QED'),
-            row=2, col=1
-        )
-    
-    if 'absorbance_nm' in molecules_df.columns:
-        fig.add_trace(
-            go.Histogram(x=molecules_df['absorbance_nm'], nbinsx=20, name='Absorbance'),
-            row=2, col=2
-        )
-    
-    fig.update_layout(height=600, showlegend=False, title_text="Property Distributions")
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Download generated molecules
-    csv = molecules_df.to_csv(index=False)
-    st.download_button(
-        label="📥 Download Generated Molecules",
-        data=csv,
-        file_name=f"generated_porphyrins_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
-    )
-else:
-    st.warning("No molecules met the property constraints. Try adjusting constraints.")
+	/ \ /
+	| |
+	\ / \
+	N HN
+	""")
+	except Exception as e:
+	st.markdown("""
+	NH N
+	/ \ /
+	| |
+	\ / \
+	N HN
+	""")
+	
+	if st.button("🎯 Generate Novel Porphyrins", use_container_width=True, type="primary"):
+	with st.spinner("Generating novel porphyrin structures..."):
+	# Generate molecules
+	smiles_list = utils.generate_porphyrin_variants(n_mols)
+	
+	# Calculate properties for each molecule
+	molecules_data = []
+	valid_molecules = []
+	valid_smiles = []
+	
+	for smiles in smiles_list:
+	    # Calculate properties
+	    properties = utils.estimate_properties(smiles)
+	    if properties:
+	        # Apply constraints
+	        valid = True
+	        if 'Molecular Weight < 1000' in property_constraints:
+	            valid = valid and properties['molecular_weight'] < 1000
+	        if 'LogP < 5' in property_constraints:
+	            valid = valid and properties['logP'] < 5
+	        if 'HBA < 10' in property_constraints:
+	            valid = valid and properties['hba'] < 10
+	        if 'HBD < 5' in property_constraints:
+	            valid = valid and properties['hbd'] < 5
+	        if 'QED > 0.5' in property_constraints:
+	            valid = valid and properties['qed'] > 0.5
+	        
+	        if valid:
+	            # Estimate optical properties
+	            abs_wl = target_abs + np.random.normal(0, 15)
+	            fluor_wl = target_fluor + np.random.normal(0, 20)
+	            qy = target_qy + np.random.normal(0, 0.05)
+	            qy = max(0, min(1, qy))
+	            
+	            properties['smiles'] = smiles
+	            properties['absorbance_nm'] = abs_wl
+	            properties['fluorescence_nm'] = fluor_wl
+	            properties['quantum_yield'] = qy
+	            molecules_data.append(properties)
+	            valid_smiles.append(smiles)
+	            
+	            if RDKIT_AVAILABLE and Chem:
+	                mol = Chem.MolFromSmiles(smiles)
+	                if mol:
+	                    valid_molecules.append(mol)
+	
+	if molecules_data:
+	    st.success(f"✅ Generated {len(molecules_data)} valid molecules meeting constraints")
+	    
+	    # Display molecules grid if RDKit available
+	    if RDKIT_AVAILABLE and Draw and valid_molecules:
+	        try:
+	            # Create grid image
+	            img = Draw.MolsToGridImage(
+	                valid_molecules[:min(9, len(valid_molecules))],
+	                molsPerRow=3,
+	                subImgSize=(200, 200),
+	                legends=[f"Mol {i+1}" for i in range(min(9, len(valid_molecules)))]
+	            )
+	            st.image(img, use_container_width=True)
+	        except Exception as e:
+	            st.warning(f"Could not generate molecule images: {str(e)}")
+	            # Fallback to text display
+	            for i, smiles in enumerate(valid_smiles[:9]):
+	                with st.expander(f"Molecule {i+1}"):
+	                    st.code(smiles)
+	                    props = molecules_data[i]
+	                    col1, col2, col3 = st.columns(3)
+	                    with col1:
+	                        st.metric("Absorbance", f"{props['absorbance_nm']:.0f} nm")
+	                    with col2:
+	                        st.metric("Fluorescence", f"{props['fluorescence_nm']:.0f} nm")
+	                    with col3:
+	                        st.metric("Quantum Yield", f"{props['quantum_yield']:.3f}")
+	    
+	    # Display properties table
+	    st.markdown("### 📊 Molecular Properties")
+	    molecules_df = pd.DataFrame(molecules_data)
+	    
+	    # Select columns to display
+	    display_cols = ['smiles', 'molecular_weight', 'logP', 'qed', 'absorbance_nm', 'fluorescence_nm', 'quantum_yield']
+	    available_cols = [col for col in display_cols if col in molecules_df.columns]
+	    st.dataframe(molecules_df[available_cols], use_container_width=True)
+	    
+	    # Property distribution plots
+	    st.markdown("### 📈 Property Distributions")
+	    
+	    fig = make_subplots(
+	        rows=2, cols=2,
+	        subplot_titles=('Molecular Weight', 'LogP', 'QED', 'Absorbance (nm)')
+	    )
+	    
+	    if 'molecular_weight' in molecules_df.columns:
+	        fig.add_trace(
+	            go.Histogram(x=molecules_df['molecular_weight'], nbinsx=20, name='MW'),
+	            row=1, col=1
+	        )
+	    
+	    if 'logP' in molecules_df.columns:
+	        fig.add_trace(
+	            go.Histogram(x=molecules_df['logP'], nbinsx=20, name='LogP'),
+	            row=1, col=2
+	        )
+	    
+	    if 'qed' in molecules_df.columns:
+	        fig.add_trace(
+	            go.Histogram(x=molecules_df['qed'], nbinsx=20, name='QED'),
+	            row=2, col=1
+	        )
+	    
+	    if 'absorbance_nm' in molecules_df.columns:
+	        fig.add_trace(
+	            go.Histogram(x=molecules_df['absorbance_nm'], nbinsx=20, name='Absorbance'),
+	            row=2, col=2
+	        )
+	    
+	    fig.update_layout(height=600, showlegend=False, title_text="Property Distributions")
+	    st.plotly_chart(fig, use_container_width=True)
+	    
+	    # Download generated molecules
+	    csv = molecules_df.to_csv(index=False)
+	    st.download_button(
+	        label="📥 Download Generated Molecules",
+	        data=csv,
+	        file_name=f"generated_porphyrins_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+	        mime="text/csv"
+	    )
+	else:
+	    st.warning("No molecules met the property constraints. Try adjusting constraints.")
 
 
 
