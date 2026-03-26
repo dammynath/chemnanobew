@@ -10,7 +10,7 @@ scipy>=1.10.0
 statsmodels>=0.14.0          # <-- add this line
 pillow>=10.0.0
 openpyxl>=3.1.0
-# rdkit-pypi            # <-- Add this line
+rdkit-pypi            # <-- Add this line
 optuna
 torch
 torch-geometric
@@ -50,7 +50,7 @@ psutil>=5.9.0
 selfheal>=0.1.0  # Optional advanced debugging
 # REINVENT4 dependencies
 #torch>=2.0.0
-rdkit-pypi==2023.3.1
+# rdkit-pypi==2023.3.1
 pydantic>=2.0.0
 tomli>=2.0.0
 
