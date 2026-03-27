@@ -1,6 +1,5 @@
 """
-nanobew_app.py – Synthesis Optimization Suite (RDKit‑Mode)
-Deploy on Streamlit Cloud with no RDKit dependency.
+nanobew_app.py – Synthesis Optimization Suite (RDKit‑Mode).
 """
 
 import streamlit as st
@@ -16,7 +15,6 @@ from sklearn.model_selection import train_test_split, cross_val_score, GridSearc
 from sklearn.preprocessing import StandardScaler, LabelEncoder, PolynomialFeatures
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.multioutput import MultiOutputRegressor
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, Matern, WhiteKernel, ConstantKernel
 from sklearn.tree import DecisionTreeRegressor
@@ -26,7 +24,6 @@ from scipy.optimize import curve_fit
 from scipy.stats import qmc
 import plotly.io as pio
 import base64
-from PIL import Image
 import subprocess
 import os
 import tempfile
@@ -116,6 +113,10 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 warnings.filterwarnings('ignore')
+
+# ============================================================================
+# REINVENT4Wrapper Class
+# ============================================================================
 class REINVENT4Wrapper:
     """
     Wrapper class for REINVENT4 - Reinforcement Learning for Molecular Design
@@ -520,6 +521,8 @@ def render_logo():
 # ============================================================================
 def normalize_series(series):
     """Normalize a pandas series to [0,1] range"""
+    if series.max() == series.min():
+        return series * 0
     return (series - series.min()) / (series.max() - series.min() + 1e-6)
 
 def calculate_composite_score(df, weights):
