@@ -51,7 +51,7 @@ except ImportError:
 try:
     from rdkit import Chem
     from rdkit.Chem import Draw, Descriptors, AllChem, rdMolDescriptors
-    from rdkit.Chem.Draw import IPythonConsole, MolsToGridImage
+    from rdkit.Chem.Draw import MolsToGridImage
     from rdkit.Chem.Scaffolds import MurckoScaffold
     from rdkit.Chem.Fingerprints import FingerprintMols
     from rdkit.Chem import rdFingerprintGenerator
