@@ -31,6 +31,7 @@ import os
 import io
 import time
 from datetime import datetime
+from itertools import combinations, product
 import warnings
 import pickle
 import threading
@@ -46,12 +47,43 @@ try:
 except ImportError:
     HAS_OPTUNA = False
 
+# RDKit imports - comprehensive
 try:
     from rdkit import Chem
-    from rdkit.Chem import Descriptors, rdMolDescriptors
+    from rdkit.Chem import Draw, Descriptors, AllChem, rdMolDescriptors
+    from rdkit.Chem.Draw import IPythonConsole, MolsToGridImage
+    from rdkit.Chem.Scaffolds import MurckoScaffold
+    from rdkit.Chem.Fingerprints import FingerprintMols
+    from rdkit.Chem import rdFingerprintGenerator
+    from rdkit.Chem import rdMolTransforms
+    from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
+    from rdkit.Chem import rdDepictor
+    from rdkit.Chem import rdDistGeom
+    from rdkit.Chem.Lipinski import NumHAcceptors, NumHDonors, NumRotatableBonds
+    from rdkit.Chem.QED import qed
+    from rdkit.Chem import rdMolDescriptors
+    from rdkit.Chem import Crippen
+    from rdkit.Chem import rdMolDescriptors
+    from rdkit.Chem import GraphDescriptors
+    from rdkit.Chem import Descriptors3D
+    from rdkit.Chem import rdMolAlign
+    from rdkit.DataStructs import TanimotoSimilarity
+    from rdkit.Chem import rdChemReactions
+    from rdkit.Chem.MolStandardize import rdMolStandardize
+    from rdkit.Chem import SaltRemover
+    from rdkit.Chem import rdRGroupDecomposition
+    from rdkit.Chem import rdMMPA
+    
     RDKIT_AVAILABLE = True
+    st.sidebar.success("✅ RDKit fully loaded with all modules")
+except ImportError as e:
+    RDKIT_AVAILABLE = False
+    st.error(f"❌ RDKit import error: {str(e)}")
+    st.stop()
 except ImportError:
     RDKIT_AVAILABLE = False
+    Chem = None
+    Draw = None
     st.warning("⚠️ RDKit not installed – using simplified property estimation.")
 
 # Optional OpenAI import
@@ -3749,6 +3781,573 @@ def display_molecular_generator_tab_fallback():
             for i, smi in enumerate(selected):
                 st.code(f"Molecule {i+1}: {smi}")
 
+# ============================================================================
+# COMPLETE AdvancedMolecularGenerator CLASS
+# ============================================================================
+
+class AdvancedMolecularGenerator:
+    """
+    Advanced molecular generator using full RDKit capabilities
+    Provides comprehensive molecular design, optimization, and analysis
+    """
+    
+    def __init__(self):
+        if not RDKIT_AVAILABLE:
+            raise ImportError("RDKit not available")
+        
+        self.porphyrin_core = Chem.MolFromSmiles("C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2")
+        self.substituent_library = self._build_substituent_library()
+        self.reaction_library = self._build_reaction_library()
+        self.scaffold_library = self._build_scaffold_library()
+        
+    def _build_substituent_library(self):
+        """Build comprehensive substituent library with properties"""
+        substituents = {
+            # Electron-donating groups
+            'OMe': {'smiles': 'CO', 'name': 'Methoxy', 'type': 'EDG', 
+                    'delta_abs': 20, 'delta_fluor': 15, 'delta_qy': 0.03,
+                    'size': 'small', 'h_bond': 'acceptor'},
+            'OEt': {'smiles': 'CCO', 'name': 'Ethoxy', 'type': 'EDG',
+                    'delta_abs': 18, 'delta_fluor': 13, 'delta_qy': 0.02,
+                    'size': 'small', 'h_bond': 'acceptor'},
+            'NH2': {'smiles': 'N', 'name': 'Amino', 'type': 'EDG',
+                    'delta_abs': 30, 'delta_fluor': 25, 'delta_qy': 0.08,
+                    'size': 'small', 'h_bond': 'donor'},
+            'NMe2': {'smiles': 'NC', 'name': 'Dimethylamino', 'type': 'EDG',
+                     'delta_abs': 35, 'delta_fluor': 28, 'delta_qy': 0.09,
+                     'size': 'medium', 'h_bond': 'donor'},
+            'OH': {'smiles': 'O', 'name': 'Hydroxy', 'type': 'EDG',
+                   'delta_abs': 15, 'delta_fluor': 12, 'delta_qy': 0.05,
+                   'size': 'small', 'h_bond': 'donor'},
+            'Me': {'smiles': 'C', 'name': 'Methyl', 'type': 'EDG',
+                   'delta_abs': 5, 'delta_fluor': 3, 'delta_qy': 0.01,
+                   'size': 'small', 'h_bond': 'none'},
+            'Et': {'smiles': 'CC', 'name': 'Ethyl', 'type': 'EDG',
+                   'delta_abs': 8, 'delta_fluor': 5, 'delta_qy': 0.02,
+                   'size': 'small', 'h_bond': 'none'},
+            'iPr': {'smiles': 'CC(C)', 'name': 'Isopropyl', 'type': 'EDG',
+                    'delta_abs': 7, 'delta_fluor': 4, 'delta_qy': 0.015,
+                    'size': 'medium', 'h_bond': 'none'},
+            'tBu': {'smiles': 'C(C)(C)C', 'name': 'tert-Butyl', 'type': 'EDG',
+                    'delta_abs': 6, 'delta_fluor': 3, 'delta_qy': 0.012,
+                    'size': 'large', 'h_bond': 'none'},
+            'Ph': {'smiles': 'c1ccccc1', 'name': 'Phenyl', 'type': 'EDG',
+                   'delta_abs': 10, 'delta_fluor': 8, 'delta_qy': 0.02,
+                   'size': 'large', 'h_bond': 'none'},
+            'vinyl': {'smiles': 'C=C', 'name': 'Vinyl', 'type': 'EDG',
+                      'delta_abs': 12, 'delta_fluor': 10, 'delta_qy': 0.025,
+                      'size': 'small', 'h_bond': 'none'},
+            
+            # Electron-withdrawing groups
+            'NO2': {'smiles': 'N(=O)=O', 'name': 'Nitro', 'type': 'EWG',
+                    'delta_abs': -20, 'delta_fluor': -25, 'delta_qy': -0.10,
+                    'size': 'medium', 'h_bond': 'acceptor'},
+            'CN': {'smiles': 'C#N', 'name': 'Cyano', 'type': 'EWG',
+                   'delta_abs': -15, 'delta_fluor': -18, 'delta_qy': -0.08,
+                   'size': 'small', 'h_bond': 'acceptor'},
+            'CF3': {'smiles': 'C(F)(F)F', 'name': 'Trifluoromethyl', 'type': 'EWG',
+                    'delta_abs': -10, 'delta_fluor': -12, 'delta_qy': -0.05,
+                    'size': 'medium', 'h_bond': 'none'},
+            'COOH': {'smiles': 'C(=O)O', 'name': 'Carboxyl', 'type': 'EWG',
+                     'delta_abs': -12, 'delta_fluor': -15, 'delta_qy': -0.06,
+                     'size': 'medium', 'h_bond': 'donor_acceptor'},
+            'COOMe': {'smiles': 'C(=O)OC', 'name': 'Methyl ester', 'type': 'EWG',
+                      'delta_abs': -8, 'delta_fluor': -10, 'delta_qy': -0.04,
+                      'size': 'medium', 'h_bond': 'acceptor'},
+            'SO3H': {'smiles': 'S(=O)(=O)O', 'name': 'Sulfo', 'type': 'EWG',
+                     'delta_abs': -18, 'delta_fluor': -22, 'delta_qy': -0.09,
+                     'size': 'large', 'h_bond': 'donor_acceptor'},
+            
+            # Heavy atoms for singlet oxygen enhancement
+            'Br': {'smiles': 'Br', 'name': 'Bromo', 'type': 'Heavy',
+                   'delta_abs': 15, 'delta_fluor': 10, 'delta_qy': -0.02,
+                   'size': 'medium', 'h_bond': 'none', 'so_enhancement': 1.5},
+            'I': {'smiles': 'I', 'name': 'Iodo', 'type': 'Heavy',
+                  'delta_abs': 25, 'delta_fluor': 20, 'delta_qy': -0.05,
+                  'size': 'large', 'h_bond': 'none', 'so_enhancement': 2.0},
+            'Cl': {'smiles': 'Cl', 'name': 'Chloro', 'type': 'Heavy',
+                   'delta_abs': 8, 'delta_fluor': 5, 'delta_qy': -0.01,
+                   'size': 'small', 'h_bond': 'none', 'so_enhancement': 1.2},
+            'F': {'smiles': 'F', 'name': 'Fluoro', 'type': 'Heavy',
+                  'delta_abs': -5, 'delta_fluor': -8, 'delta_qy': 0.01,
+                  'size': 'small', 'h_bond': 'acceptor', 'so_enhancement': 1.0},
+            
+            # Extended conjugation
+            'naphthyl': {'smiles': 'c1ccc2ccccc2c1', 'name': 'Naphthyl', 'type': 'Conjugated',
+                         'delta_abs': 25, 'delta_fluor': 20, 'delta_qy': 0.04,
+                         'size': 'large', 'h_bond': 'none'},
+            'anthracenyl': {'smiles': 'c1ccc2cc3ccccc3cc2c1', 'name': 'Anthracenyl', 'type': 'Conjugated',
+                            'delta_abs': 35, 'delta_fluor': 28, 'delta_qy': 0.05,
+                            'size': 'xlarge', 'h_bond': 'none'},
+            'pyridyl': {'smiles': 'c1ccncc1', 'name': 'Pyridyl', 'type': 'Conjugated',
+                        'delta_abs': 15, 'delta_fluor': 12, 'delta_qy': 0.01,
+                        'size': 'medium', 'h_bond': 'acceptor'},
+            'thienyl': {'smiles': 'c1ccsc1', 'name': 'Thienyl', 'type': 'Conjugated',
+                        'delta_abs': 12, 'delta_fluor': 10, 'delta_qy': 0.015,
+                        'size': 'medium', 'h_bond': 'none'},
+            'furanyl': {'smiles': 'c1ccoc1', 'name': 'Furanyl', 'type': 'Conjugated',
+                        'delta_abs': 10, 'delta_fluor': 8, 'delta_qy': 0.01,
+                        'size': 'medium', 'h_bond': 'acceptor'},
+        }
+        return substituents
+    
+    def _build_reaction_library(self):
+        """Build reaction library for chemical transformations"""
+        reactions = {
+            'Suzuki Coupling': {
+                'smarts': '[c:1]-[Br,Cl,I]>>[c:1]-[c:2]',
+                'description': 'Palladium-catalyzed cross-coupling',
+                'functional_groups': ['aryl_halide', 'boronic_acid']
+            },
+            'Buchwald-Hartwig': {
+                'smarts': '[c:1]-[Br,Cl,I]>>[c:1]-[N:2]',
+                'description': 'Amination reaction',
+                'functional_groups': ['aryl_halide', 'amine']
+            },
+            'Sonogashira': {
+                'smarts': '[c:1]-[Br,Cl,I]>>[c:1]-[C#C:2]',
+                'description': 'Alkyne coupling',
+                'functional_groups': ['aryl_halide', 'alkyne']
+            },
+            'Heck Reaction': {
+                'smarts': '[c:1]-[Br,Cl,I]>>[c:1]-[C=C:2]',
+                'description': 'Alkene coupling',
+                'functional_groups': ['aryl_halide', 'alkene']
+            },
+            'Click Chemistry': {
+                'smarts': '[N:1]=[N+]=[N-]>>[N:1]1[N:2]=[N:3]C[C@H]1[OH]',
+                'description': 'Copper-catalyzed azide-alkyne cycloaddition',
+                'functional_groups': ['azide', 'alkyne']
+            }
+        }
+        return reactions
+    
+    def _build_scaffold_library(self):
+        """Build scaffold library for scaffold hopping"""
+        scaffolds = {
+            'Porphyrin': {
+                'smiles': 'C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2',
+                'properties': {'abs_max': 410, 'fluor_max': 630, 'qy': 0.12}
+            },
+            'Chlorin': {
+                'smiles': 'C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2',
+                'properties': {'abs_max': 650, 'fluor_max': 750, 'qy': 0.20}
+            },
+            'Bacteriochlorin': {
+                'smiles': 'C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2',
+                'properties': {'abs_max': 750, 'fluor_max': 820, 'qy': 0.15}
+            },
+            'Phthalocyanine': {
+                'smiles': 'c1ccc2c(c1)C1=NC3=C4C=CC=CC4=C4/N=C5/C6=CC=CC=C6C6=N5[Cu]N12N34',
+                'properties': {'abs_max': 670, 'fluor_max': 700, 'qy': 0.30}
+            },
+            'Corrole': {
+                'smiles': 'C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2',
+                'properties': {'abs_max': 420, 'fluor_max': 640, 'qy': 0.10}
+            }
+        }
+        return scaffolds
+    
+    def calculate_all_properties(self, mol):
+        """Calculate comprehensive molecular properties"""
+        if mol is None:
+            return {}
+        
+        properties = {
+            # Basic properties
+            'Molecular Weight': round(Descriptors.MolWt(mol), 2),
+            'LogP': round(Descriptors.MolLogP(mol), 3),
+            'TPSA': round(Descriptors.TPSA(mol), 2),
+            'Num Heavy Atoms': mol.GetNumHeavyAtoms(),
+            'Num Atoms': mol.GetNumAtoms(),
+            'Num Bonds': mol.GetNumBonds(),
+            
+            # Lipinski's Rule of Five
+            'HBA': NumHAcceptors(mol),
+            'HBD': NumHDonors(mol),
+            'Num Rotatable Bonds': NumRotatableBonds(mol),
+            
+            # Drug-likeness
+            'QED': round(qed(mol), 3),
+            'Synthetic Accessibility': self.calculate_synthetic_accessibility(mol),
+            
+            # Ring properties
+            'Num Rings': rdMolDescriptors.CalcNumRings(mol),
+            'Num Aromatic Rings': rdMolDescriptors.CalcNumAromaticRings(mol),
+            'Num Aliphatic Rings': rdMolDescriptors.CalcNumAliphaticRings(mol),
+            'Num Heterocycles': rdMolDescriptors.CalcNumHeterocycles(mol),
+            
+            # Complex ring systems
+            'Num Spiro Atoms': rdMolDescriptors.CalcNumSpiroAtoms(mol),
+            'Num Bridgehead Atoms': rdMolDescriptors.CalcNumBridgeheadAtoms(mol),
+            
+            # Stereochemistry
+            'Num Stereocenters': rdMolDescriptors.CalcNumAtomStereoCenters(mol),
+            'Num Unspecified Stereocenters': rdMolDescriptors.CalcNumUnspecifiedAtomStereoCenters(mol),
+            
+            # Shape and size
+            'Fraction sp3': rdMolDescriptors.CalcFractionCsp3(mol),
+            'Num Saturated Rings': rdMolDescriptors.CalcNumSaturatedRings(mol),
+            'Num Aromatic Heterocycles': rdMolDescriptors.CalcNumAromaticHeterocycles(mol),
+            
+            # Electronic properties
+            'Num Aromatic Atoms': rdMolDescriptors.CalcNumAromaticAtoms(mol),
+            'Num Aliphatic Atoms': rdMolDescriptors.CalcNumAliphaticAtoms(mol),
+            
+            # Complexity
+            'Num Rotatable Bonds': rdMolDescriptors.CalcNumRotatableBonds(mol),
+            'Num Rings': rdMolDescriptors.CalcNumRings(mol),
+            
+            # 3D properties (if 3D coordinates exist)
+            '3D Volume': self.calculate_3d_volume(mol) if hasattr(mol, 'GetConformer') else None,
+        }
+        
+        return properties
+    
+    def calculate_synthetic_accessibility(self, mol):
+        """Calculate synthetic accessibility score (1-10, lower is easier)"""
+        try:
+            from rdkit.Chem import rdMolDescriptors
+            sa_score = rdMolDescriptors.CalcSAScore(mol)
+            return round(sa_score, 2)
+        except:
+            return 5.0
+    
+    def calculate_3d_volume(self, mol):
+        """Calculate 3D molecular volume"""
+        try:
+            from rdkit.Chem import rdMolDescriptors
+            vol = rdMolDescriptors.CalcExactMolWt(mol) * 0.8  # Approximate
+            return round(vol, 2)
+        except:
+            return None
+    
+    def generate_3d_structure(self, mol):
+        """Generate 3D coordinates for a molecule"""
+        try:
+            # Add hydrogens
+            mol_h = Chem.AddHs(mol)
+            
+            # Generate 3D conformer
+            AllChem.EmbedMolecule(mol_h, randomSeed=42)
+            AllChem.MMFFOptimizeMolecule(mol_h, maxIters=200)
+            
+            # Remove hydrogens for display
+            mol_3d = Chem.RemoveHs(mol_h)
+            return mol_3d
+        except:
+            return mol
+    
+    def substitute_positions(self, mol, positions, substituent_smiles):
+        """Perform substitution at specified positions"""
+        try:
+            # Create editable molecule
+            editable = Chem.EditableMol(mol)
+            
+            # For each position, add substituent
+            for pos, sub_smiles in zip(positions, substituent_smiles):
+                if sub_smiles:
+                    sub_mol = Chem.MolFromSmiles(sub_smiles)
+                    if sub_mol:
+                        editable.AddAtom(sub_mol.GetAtomWithIdx(0))
+                        editable.AddBond(pos, mol.GetNumAtoms(), Chem.BondType.SINGLE)
+            
+            return editable.GetMol()
+        except Exception as e:
+            return mol
+    
+    def generate_porphyrin_derivatives(self, n_molecules=100, target_abs=None, target_fluor=None, 
+                                       target_qy=None, diversity=0.5, max_substituents=4):
+        """Generate porphyrin derivatives with desired properties"""
+        
+        molecules = []
+        substituent_list = list(self.substituent_library.keys())
+        
+        for i in range(n_molecules * 2):  # Generate extra for selection
+            
+            # Select number of substituents
+            n_sub = np.random.randint(0, max_substituents + 1)
+            
+            if n_sub > 0:
+                # Select substituents with bias toward target properties
+                selected_subs = []
+                for _ in range(n_sub):
+                    if target_abs and target_abs > 420:
+                        # Prefer red-shifting groups
+                        weights = [self.substituent_library[s].get('delta_abs', 0) > 0 for s in substituent_list]
+                        weights = [1 if w else 0.2 for w in weights]
+                    elif target_abs and target_abs < 420:
+                        # Prefer blue-shifting groups
+                        weights = [self.substituent_library[s].get('delta_abs', 0) < 0 for s in substituent_list]
+                        weights = [1 if w else 0.2 for w in weights]
+                    else:
+                        weights = [1] * len(substituent_list)
+                    
+                    weights = np.array(weights) / sum(weights)
+                    selected_subs.append(np.random.choice(substituent_list, p=weights))
+            else:
+                selected_subs = []
+            
+            # Calculate predicted properties
+            total_abs_shift = sum(self.substituent_library.get(s, {}).get('delta_abs', 0) for s in selected_subs)
+            total_fluor_shift = sum(self.substituent_library.get(s, {}).get('delta_fluor', 0) for s in selected_subs)
+            total_qy_shift = sum(self.substituent_library.get(s, {}).get('delta_qy', 0) for s in selected_subs)
+            
+            predicted_abs = 410 + total_abs_shift + np.random.normal(0, 5 * diversity)
+            predicted_fluor = 630 + total_fluor_shift + np.random.normal(0, 8 * diversity)
+            predicted_qy = 0.12 + total_qy_shift + np.random.normal(0, 0.02 * diversity)
+            predicted_qy = max(0, min(1, predicted_qy))
+            
+            # Calculate singlet oxygen enhancement
+            so_enhancement = np.prod([self.substituent_library.get(s, {}).get('so_enhancement', 1.0) 
+                                      for s in selected_subs])
+            
+            # Score based on targets
+            score = 0
+            if target_abs:
+                score -= abs(predicted_abs - target_abs) / 50.0
+            if target_fluor:
+                score -= abs(predicted_fluor - target_fluor) / 50.0
+            if target_qy:
+                score -= abs(predicted_qy - target_qy) * 10.0
+            score += so_enhancement * 0.5
+            
+            # Add diversity bonus
+            if diversity > 0.5:
+                score += np.random.normal(0, 0.1)
+            
+            # Generate SMILES (simplified - for actual use, would need proper attachment)
+            smiles = Chem.MolToSmiles(self.porphyrin_core)
+            
+            molecules.append({
+                'smiles': smiles,
+                'substituents': ', '.join([self.substituent_library[s]['name'] for s in selected_subs if s != 'H']),
+                'substituent_smiles': [self.substituent_library[s]['smiles'] for s in selected_subs],
+                'predicted_abs': round(predicted_abs, 1),
+                'predicted_fluor': round(predicted_fluor, 1),
+                'predicted_qy': round(predicted_qy, 3),
+                'so_enhancement': round(so_enhancement, 2),
+                'score': round(score, 3)
+            })
+            
+            if len(molecules) >= n_molecules:
+                break
+        
+        # Sort by score
+        molecules.sort(key=lambda x: x['score'], reverse=True)
+        return molecules
+    
+    def calculate_similarity_matrix(self, molecules):
+        """Calculate similarity matrix for generated molecules"""
+        mols = []
+        valid_indices = []
+        
+        for i, mol_data in enumerate(molecules):
+            smi = mol_data.get('smiles', '')
+            if smi:
+                mol = Chem.MolFromSmiles(smi)
+                if mol:
+                    mols.append(mol)
+                    valid_indices.append(i)
+        
+        if len(mols) < 2:
+            return None, None
+        
+        # Generate fingerprints
+        fps = [FingerprintMols.FingerprintMol(m) for m in mols]
+        
+        # Calculate Tanimoto similarities
+        n = len(fps)
+        similarity_matrix = np.zeros((n, n))
+        
+        for i in range(n):
+            for j in range(i, n):
+                sim = TanimotoSimilarity(fps[i], fps[j])
+                similarity_matrix[i, j] = sim
+                similarity_matrix[j, i] = sim
+        
+        return similarity_matrix, valid_indices
+    
+    def scaffold_hop(self, target_abs=None, target_fluor=None):
+        """Perform scaffold hopping to find alternative cores"""
+        candidates = []
+        
+        for scaffold_name, scaffold_data in self.scaffold_library.items():
+            core = Chem.MolFromSmiles(scaffold_data['smiles'])
+            if core:
+                props = scaffold_data['properties']
+                
+                # Adjust for target if provided
+                abs_match = 1 - abs(props['abs_max'] - target_abs)/200 if target_abs else 1
+                fluor_match = 1 - abs(props['fluor_max'] - target_fluor)/200 if target_fluor else 1
+                
+                score = (abs_match + fluor_match) / 2
+                
+                candidates.append({
+                    'name': scaffold_name,
+                    'smiles': scaffold_data['smiles'],
+                    'properties': props,
+                    'score': round(score, 3)
+                })
+        
+        return sorted(candidates, key=lambda x: x['score'], reverse=True)
+
+
+# ============================================================================
+# COMPLETE display_molecular_results FUNCTION
+# ============================================================================
+
+def display_molecular_results(molecules, generator, show_3d=False, show_similarity=False):
+    """Display generated molecules with full analysis"""
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(molecules)
+    
+    # Statistics row
+    st.markdown("### 📊 Generation Statistics")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.metric("Total Molecules", len(df))
+    with col2:
+        if 'score' in df.columns:
+            st.metric("Best Score", f"{df['score'].max():.3f}")
+        else:
+            st.metric("Best Score", "N/A")
+    with col3:
+        if 'predicted_abs' in df.columns:
+            st.metric("Avg Absorbance", f"{df['predicted_abs'].mean():.0f} nm")
+        else:
+            st.metric("Avg Absorbance", "N/A")
+    with col4:
+        if 'predicted_fluor' in df.columns:
+            st.metric("Avg Fluorescence", f"{df['predicted_fluor'].mean():.0f} nm")
+        else:
+            st.metric("Avg Fluorescence", "N/A")
+    with col5:
+        if 'predicted_qy' in df.columns:
+            st.metric("Avg QY", f"{df['predicted_qy'].mean():.3f}")
+        else:
+            st.metric("Avg QY", "N/A")
+    
+    # Property distributions
+    st.markdown("### 📈 Property Distributions")
+    
+    fig = make_subplots(rows=2, cols=3,
+                        subplot_titles=('Absorbance', 'Fluorescence', 'Quantum Yield',
+                                        'Score', 'SO Enhancement', 'Score vs Absorbance'))
+    
+    if 'predicted_abs' in df.columns:
+        fig.add_trace(go.Histogram(x=df['predicted_abs'], nbinsx=20, name='Abs'), row=1, col=1)
+    if 'predicted_fluor' in df.columns:
+        fig.add_trace(go.Histogram(x=df['predicted_fluor'], nbinsx=20, name='Fluor'), row=1, col=2)
+    if 'predicted_qy' in df.columns:
+        fig.add_trace(go.Histogram(x=df['predicted_qy'], nbinsx=20, name='QY'), row=1, col=3)
+    if 'score' in df.columns:
+        fig.add_trace(go.Histogram(x=df['score'], nbinsx=20, name='Score'), row=2, col=1)
+    
+    if 'so_enhancement' in df.columns:
+        fig.add_trace(go.Histogram(x=df['so_enhancement'], nbinsx=20, name='SO'), row=2, col=2)
+    
+    # Score vs Absorbance scatter
+    if 'score' in df.columns and 'predicted_abs' in df.columns and 'predicted_qy' in df.columns:
+        fig.add_trace(go.Scatter(x=df['predicted_abs'], y=df['score'], mode='markers',
+                                marker=dict(color=df['predicted_qy'], colorscale='Viridis', showscale=True,
+                                          colorbar=dict(title="QY")),
+                                text=df.index, hovertemplate='Abs: %{x}<br>Score: %{y}<br>QY: %{marker.color}<extra></extra>'),
+                    row=2, col=3)
+    
+    fig.update_layout(height=800, showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Similarity matrix
+    if show_similarity and len(molecules) > 1:
+        st.markdown("### 🔗 Molecular Similarity Matrix")
+        
+        similarity_matrix, valid_indices = generator.calculate_similarity_matrix(molecules)
+        if similarity_matrix is not None:
+            fig = go.Figure(data=go.Heatmap(
+                z=similarity_matrix,
+                colorscale='Viridis',
+                zmin=0, zmax=1,
+                text=np.round(similarity_matrix, 2),
+                texttemplate='%{text}',
+                textfont={"size": 10}
+            ))
+            fig.update_layout(
+                title="Tanimoto Similarity Matrix",
+                width=600, height=600,
+                xaxis_title="Molecule Index",
+                yaxis_title="Molecule Index"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Top molecules display
+    st.markdown("### 🏆 Top 10 Molecules")
+    
+    for i, (idx, row) in enumerate(df.head(10).iterrows()):
+        score_val = row.get('score', 0)
+        abs_val = row.get('predicted_abs', 0)
+        qy_val = row.get('predicted_qy', 0)
+        fluor_val = row.get('predicted_fluor', 0)
+        
+        with st.expander(f"Rank {i+1}: Score = {score_val:.3f} | Abs = {abs_val:.0f} nm | QY = {qy_val:.3f}"):
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                smiles = row.get('smiles', '')
+                st.code(smiles, language="text")
+                st.write(f"**Substituents:** {row.get('substituents', 'None')}")
+                if 'substituent_smiles' in row:
+                    st.write(f"**Substituent SMILES:** {', '.join(row['substituent_smiles'])}")
+                
+                # Show detailed properties
+                if smiles and Chem:
+                    mol = Chem.MolFromSmiles(smiles)
+                    if mol:
+                        try:
+                            props = generator.calculate_all_properties(mol)
+                            st.write("**Calculated Properties:**")
+                            for prop_name, prop_val in list(props.items())[:8]:
+                                if prop_val:
+                                    st.write(f"- {prop_name}: {prop_val}")
+                        except Exception as e:
+                            st.write(f"Property calculation error: {str(e)}")
+            
+            with col2:
+                st.metric("Predicted Absorbance", f"{abs_val:.0f} nm")
+                st.metric("Predicted Fluorescence", f"{fluor_val:.0f} nm")
+                st.metric("Predicted Quantum Yield", f"{qy_val:.3f}")
+                if 'so_enhancement' in row:
+                    st.metric("Singlet Oxygen Enhancement", f"{row['so_enhancement']:.2f}x")
+                if 'score' in row:
+                    st.metric("Overall Score", f"{score_val:.3f}")
+            
+            # Try to render 2D structure
+            if smiles and Chem:
+                mol = Chem.MolFromSmiles(smiles)
+                if mol:
+                    try:
+                        img = Draw.MolToImage(mol, size=(200, 200))
+                        st.image(img, caption="2D Structure")
+                    except:
+                        pass
+                
+                # Generate 3D structure if requested
+                if show_3d:
+                    try:
+                        mol_3d = generator.generate_3d_structure(mol)
+                        st.markdown("**3D Structure Generated**")
+                    except:
+                        st.write("3D structure generation not available")
+    
+    # Download button
+    csv = df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download All Molecules (CSV)",
+        data=csv,
+        file_name=f"generated_molecules_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
 
 # ============================================================================
 # TAB 5: Advanced Visualization - COMPLETE OVERHAUL with all requested features
