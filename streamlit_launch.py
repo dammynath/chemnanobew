@@ -9,8 +9,9 @@ import subprocess
 
 #file = deep.py
 #file = "chemnanobew_app.py"
-file = "nanobew_app.py"
+#file = "nanobew_app.py"
 #file = "new_app.py"
+file = "nanobew.py"
 
 subprocess.Popen(
     ["streamlit", "run", file], shell=True
