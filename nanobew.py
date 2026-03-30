@@ -5898,7 +5898,7 @@ def display_advanced_visualization(uploaded_file):
 # TAB 6: PCE Analyzer - UPDATED with Adaptive R² (Maximizing Linear Points)
 # ============================================================================
 
-def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.99):
+def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.985):
     """
     Find the longest linear region in the -ln(theta) vs time plot that maintains high R².
     Adaptively extends the region while monitoring R² degradation.
