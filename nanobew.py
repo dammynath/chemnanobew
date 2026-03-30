@@ -5907,7 +5907,7 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     - time_values: array of time values (minutes)
     - ln_theta_values: array of -ln(theta) values
     - min_points: minimum number of points required for linear fit
-    - r2_threshold: minimum R² value to maintain (default 0.99)
+    - r2_threshold: minimum R² value to maintain (default 0.985)
     
     Returns:
     - Dictionary with optimal region parameters
@@ -6118,7 +6118,7 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
         cooling_data['time_from_peak'].values,
         cooling_data['neg_ln_theta'].values,
         min_points=5,
-        r2_threshold=0.99
+        r2_threshold=0.985
     )
     
     # Calculate tau from the optimal region slope
