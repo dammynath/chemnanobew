@@ -5897,15 +5897,6 @@ def display_advanced_visualization(uploaded_file):
 # ============================================================================
 # TAB: PCE Analyzer - COMPLETE WITH ADAPTIVE R² AND Q_dis CORRECTION
 # ============================================================================
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import io
-from datetime import datetime
-from scipy import stats
-
 def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.985):
     """
     Find the longest linear region in the -ln(theta) vs time plot that maintains high R².
