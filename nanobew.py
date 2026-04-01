@@ -6453,123 +6453,133 @@ def display_pce_tab():
         "📉 Cooling Curve Analysis",
         "📋 Results Summary"
     ])
-    
+
     # ========================================================================
     # Tab 1: Data Input
     # ========================================================================
     with pce_tabs[0]:
-        col1, col2 = st.columns([1, 1])
+        # Use a single column layout for better spacing
+        st.markdown("### 📁 Data Source")
         
-        with col1:
-            st.markdown("### 📁 Data Source")
-            
-            data_source = st.radio(
-                "Select data source:",
-                ["Use Sample Data", "Upload Custom CSV"],
-                key="pce_data_source"
+        data_source = st.radio(
+            "Select data source:",
+            ["Use Sample Data", "Upload Custom CSV"],
+            key="pce_data_source",
+            horizontal=True
+        )
+        
+        if data_source == "Upload Custom CSV":
+            uploaded_file = st.file_uploader(
+                "Upload time-temperature CSV",
+                type=['csv'],
+                key="pce_uploader"
             )
-            
-            if data_source == "Upload Custom CSV":
-                uploaded_file = st.file_uploader(
-                    "Upload time-temperature CSV",
-                    type=['csv'],
-                    key="pce_uploader"
-                )
-                if uploaded_file is not None:
-                    df, encoding = load_custom_csv(uploaded_file)
-                    if df is not None:
-                        st.success(f"✅ Loaded with {encoding} encoding")
-                        st.session_state['pce_data'] = df
-                    else:
-                        st.error("Could not read file. Please check the file format.")
-                        df = None
+            if uploaded_file is not None:
+                df, encoding = load_custom_csv(uploaded_file)
+                if df is not None:
+                    st.success(f"✅ Loaded with {encoding} encoding")
+                    st.session_state['pce_data'] = df
                 else:
-                    df = st.session_state.get('pce_data', None)
+                    st.error("Could not read file. Please check the file format.")
+                    df = None
             else:
-                df = load_sample_data()
-                st.info("📊 Using sample data (expected PCE: ~26%)")
-                st.session_state['pce_data'] = df
+                df = st.session_state.get('pce_data', None)
+        else:
+            df = load_sample_data()
+            st.info("📊 Using sample data (expected PCE: ~26%)")
+            st.session_state['pce_data'] = df
+        
+        if df is not None:
+            st.session_state['pce_data'] = df
             
-            if df is not None:
-                st.session_state['pce_data'] = df
-                
-                # Display raw data
+            # Data preview and stats in columns
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
                 st.markdown("### 👁️ Data Preview")
                 st.dataframe(df.head(10), use_container_width=True)
-                
-                # Data statistics
-                col1, col2, col3 = st.columns(3)
-                with col1:
+            
+            with col2:
+                st.markdown("### 📊 Data Statistics")
+                col_stats1, col_stats2, col_stats3 = st.columns(3)
+                with col_stats1:
                     st.metric("Total Time Points", len(df))
-                with col2:
+                with col_stats2:
                     st.metric("Max Temperature", f"{df['temperature_°C'].max():.1f}°C")
-                with col3:
+                with col_stats3:
                     st.metric("Min Temperature", f"{df['temperature_°C'].min():.1f}°C")
-        
-        with col2:
-            if df is not None:
-                st.markdown("### 📈 Raw Data Plot")
+            
+            # Raw Data Plot - Full width
+            st.markdown("---")
+            st.markdown("### 📈 Raw Data Plot")
+            
+            # Identify heating and cooling phases
+            temp_peak_idx = df['temperature_°C'].idxmax()
+            peak_time = df.loc[temp_peak_idx, 'time_mins']
+            peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
+            
+            fig = go.Figure()
+            
+            # Heating phase
+            fig.add_trace(go.Scatter(
+                x=df['time_mins'].iloc[:temp_peak_idx+1],
+                y=df['temperature_°C'].iloc[:temp_peak_idx+1],
+                mode='lines+markers',
+                name='Heating Phase',
+                line=dict(color='red', width=2),
+                marker=dict(size=4)
+            ))
+            
+            # Cooling phase
+            fig.add_trace(go.Scatter(
+                x=df['time_mins'].iloc[temp_peak_idx:],
+                y=df['temperature_°C'].iloc[temp_peak_idx:],
+                mode='lines+markers',
+                name='Cooling Phase',
+                line=dict(color='blue', width=2),
+                marker=dict(size=4)
+            ))
+            
+            # Mark peak
+            fig.add_trace(go.Scatter(
+                x=[peak_time],
+                y=[peak_temp],
+                mode='markers',
+                name=f'Peak: {peak_temp:.1f}°C',
+                marker=dict(color='green', size=12, symbol='star')
+            ))
+            
+            fig.update_layout(
+                title="Temperature Profile (Heating & Cooling)",
+                xaxis_title="Time (mins)",
+                yaxis_title="Temperature (°C)",
+                hovermode='x unified',
+                height=450,
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Store peak information
+            st.session_state['peak_idx'] = temp_peak_idx
+            st.session_state['peak_time'] = peak_time
+            st.session_state['peak_temp'] = peak_temp
+            
+            # Solvent Blank Data Section - Full width with better layout
+            st.markdown("---")
+            st.markdown("### 🧪 Solvent Blank Data (for Q<sub>dis</sub>)", unsafe_allow_html=True)
+            
+            solvent_source = st.radio(
+                "Solvent data source:",
+                ["Use Estimated ΔT", "Upload Solvent CSV"],
+                key="solvent_source",
+                horizontal=True
+            )
+            
+            if solvent_source == "Upload Solvent CSV":
+                col_solvent1, col_solvent2 = st.columns([1, 1])
                 
-                # Identify heating and cooling phases
-                temp_peak_idx = df['temperature_°C'].idxmax()
-                peak_time = df.loc[temp_peak_idx, 'time_mins']
-                peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
-                
-                fig = go.Figure()
-                
-                # Heating phase
-                fig.add_trace(go.Scatter(
-                    x=df['time_mins'].iloc[:temp_peak_idx+1],
-                    y=df['temperature_°C'].iloc[:temp_peak_idx+1],
-                    mode='lines+markers',
-                    name='Heating Phase',
-                    line=dict(color='red', width=2),
-                    marker=dict(size=4)
-                ))
-                
-                # Cooling phase
-                fig.add_trace(go.Scatter(
-                    x=df['time_mins'].iloc[temp_peak_idx:],
-                    y=df['temperature_°C'].iloc[temp_peak_idx:],
-                    mode='lines+markers',
-                    name='Cooling Phase',
-                    line=dict(color='blue', width=2),
-                    marker=dict(size=4)
-                ))
-                
-                # Mark peak
-                fig.add_trace(go.Scatter(
-                    x=[peak_time],
-                    y=[peak_temp],
-                    mode='markers',
-                    name=f'Peak: {peak_temp:.1f}°C',
-                    marker=dict(color='green', size=12, symbol='star')
-                ))
-                
-                fig.update_layout(
-                    title="Temperature Profile (Heating & Cooling)",
-                    xaxis_title="Time (mins)",
-                    yaxis_title="Temperature (°C)",
-                    hovermode='x unified',
-                    height=400
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Store peak information
-                st.session_state['peak_idx'] = temp_peak_idx
-                st.session_state['peak_time'] = peak_time
-                st.session_state['peak_temp'] = peak_temp
-                
-                st.markdown("### 🧪 Solvent Blank Data (for Q<sub>dis</sub>)", unsafe_allow_html=True)
-                
-                solvent_source = st.radio(
-                    "Solvent data:",
-                    ["Use Estimated ΔT", "Upload Solvent CSV"],
-                    key="solvent_source"
-                )
-                
-                if solvent_source == "Upload Solvent CSV":
+                with col_solvent1:
                     solvent_file = st.file_uploader("Upload solvent CSV", type=['csv'], key="solvent_upload")
                     if solvent_file is not None:
                         try:
@@ -6581,9 +6591,37 @@ def display_pce_tab():
                             st.success("✅ Solvent data loaded")
                         except Exception as e:
                             st.error(f"Error: {e}")
-                else:
-                    # Use estimated ΔT
-                    st.session_state['solvent_data'] = None
+                
+                if st.session_state.get('solvent_data') is not None:
+                    with col_solvent2:
+                        solvent_df = st.session_state['solvent_data']
+                        st.markdown("#### Solvent Data Preview")
+                        st.dataframe(solvent_df.head(5), use_container_width=True)
+                        solvent_peak_idx = solvent_df['temperature_°C'].idxmax()
+                        st.metric("Solvent Peak Temp", f"{solvent_df.loc[solvent_peak_idx, 'temperature_°C']:.1f}°C")
+                        
+                        # Plot solvent data
+                        fig_solvent = go.Figure()
+                        fig_solvent.add_trace(go.Scatter(
+                            x=solvent_df['time_mins'],
+                            y=solvent_df['temperature_°C'],
+                            mode='lines+markers',
+                            name='Solvent Temperature',
+                            line=dict(color='orange', width=2),
+                            marker=dict(size=4)
+                        ))
+                        fig_solvent.update_layout(
+                            title="Solvent Temperature Profile",
+                            xaxis_title="Time (mins)",
+                            yaxis_title="Temperature (°C)",
+                            height=300
+                        )
+                        st.plotly_chart(fig_solvent, use_container_width=True)
+            else:
+                # Use estimated ΔT
+                st.session_state['solvent_data'] = None
+                col_est1, col_est2, col_est3 = st.columns([1, 2, 1])
+                with col_est2:
                     st.session_state['solvent_delta_estimate'] = st.number_input(
                         "Estimated Solvent ΔT (°C)", 
                         min_value=0.0, 
@@ -6593,12 +6631,7 @@ def display_pce_tab():
                         format="%.1f",
                         help="Maximum temperature rise of pure solvent"
                     )
-                
-                if st.session_state.get('solvent_data') is not None:
-                    solvent_df = st.session_state['solvent_data']
-                    st.dataframe(solvent_df.head(5), use_container_width=True)
-                    solvent_peak_idx = solvent_df['temperature_°C'].idxmax()
-                    st.metric("Solvent Peak Temp", f"{solvent_df.loc[solvent_peak_idx, 'temperature_°C']:.1f}°C")
+
     
     # ========================================================================
     # Tab 2: PCE Parameters
