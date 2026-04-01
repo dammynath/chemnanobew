@@ -6438,7 +6438,7 @@ def display_pce_tab():
     
     st.markdown("""
     <div class='info-box'>
-    <strong>Complete PCE Calculation with Q<sub>dis</sub> (Solvent Correction)</strong><br><br>
+    <strong>PCE Calculation with Q<sub>dis</sub> (Solvent Correction)</strong><br><br>
     η = [hS × (ΔT<sub>sample</sub> - ΔT<sub>solvent</sub>)] / [I × (1 - 10<sup>-A<sub>λ</sub></sup>)] × 100%<br><br>
     Where Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub> accounts for heat dissipated by the pure solvent.
     The algorithm automatically finds the optimal linear region with R² ≥ 0.985.
