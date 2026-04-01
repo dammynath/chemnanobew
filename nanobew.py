@@ -6150,9 +6150,9 @@ def display_pce_tab():
     
     st.markdown("""
     <div class='info-box'>
-    <strong>Complete PCE Calculation with Q <sub>dis</sub> (Solvent Correction)</strong><br><br>
+    <strong>Complete PCE Calculation with Q<sub>dis</sub> (Solvent Correction)</strong><br><br>
     η = [hS × (ΔT<sub>sample</sub> - ΔT<sub>solvent</sub>)] / [I × (1 - 10<sup>-A<sub>λ</sub></sup>)] × 100%<br><br>
-    Where Q <sub>dis</sub> = hS × ΔT<sub>solvent</sub> accounts for heat dissipated by the pure solvent.
+    Where Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub> accounts for heat dissipated by the pure solvent.
     </div>
     """, unsafe_allow_html=True)
     
@@ -6228,7 +6228,7 @@ def display_pce_tab():
                     st.metric("Min Temp", f"{df['temperature_°C'].min():.1f}°C")
         
         with col2:
-            st.markdown("### 🧪 Solvent Blank Data (for Q <sub>dis</sub>)")
+            st.markdown("### 🧪 Solvent Blank Data (for Q<sub>dis</sub>)")
             
             solvent_source = st.radio(
                 "Solvent data:",
@@ -6373,7 +6373,7 @@ def display_pce_tab():
             if not params:
                 st.warning("⚠️ Please configure PCE parameters in the Parameters tab.")
             else:
-                st.markdown("### 📈 Photothermal Analysis with Q <sub>dis</sub>")
+                st.markdown("### 📈 Photothermal Analysis with Q<sub>dis</sub>")
                 
                 # Get solvent peak if available
                 solvent_peak_idx = None
@@ -6395,7 +6395,7 @@ def display_pce_tab():
                     st.metric("hS", f"{results['hS']:.4f} W/K")
                 
                 # Q_dis display
-                st.markdown("### 🔥 Q <sub>dis</sub> (Solvent Heat Dissipation)")
+                st.markdown("### 🔥 Q<sub>dis</sub> (Solvent Heat Dissipation)")
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("ΔT Sample", f"{results['delta_T_sample']:.2f}°C")
@@ -6406,7 +6406,7 @@ def display_pce_tab():
                 
                 st.markdown(f"""
                 <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;'>
-                    <strong>Q <sub>dis</sub> = hS × ΔT<sub>solvent</sub></strong> = {results['hS']:.4f} W/K × {results['delta_T_solvent']:.2f}°C = <strong>{results['Q_dis']:.4f} W</strong>
+                    <strong>Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub></strong> = {results['hS']:.4f} W/K × {results['delta_T_solvent']:.2f}°C = <strong>{results['Q_dis']:.4f} W</strong>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -6554,9 +6554,9 @@ def display_pce_tab():
                 st.write(f"**ΔT Solvent:** {results['delta_T_solvent']:.2f}°C")
                 st.write(f"**ΔT Net:** {results['delta_T_net']:.2f}°C")
                 
-                st.markdown("#### 🔥 Q <sub>dis</sub> Calculation")
-                st.write(f"**Q <sub>dis</sub> = hS × ΔT<sub>solvent</sub>**")
-                st.write(f"**Q <sub>dis</sub>:** {results['Q_dis']:.4f} W")
+                st.markdown("#### 🔥 Q<sub>dis</sub> Calculation")
+                st.write(f"**Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub>**")
+                st.write(f"**Q<sub>dis</sub>:** {results['Q_dis']:.4f} W")
                 st.write(f"**P<sub>absorbed</sub>:** {results['P_absorbed']:.3f} W")
             
             st.markdown("---")
