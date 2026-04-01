@@ -6561,7 +6561,7 @@ def display_pce_tab():
                 st.session_state['peak_time'] = peak_time
                 st.session_state['peak_temp'] = peak_temp
                 
-                st.markdown("### 🧪 Solvent Blank Data (for Q<sub>dis</sub>)")
+                st.markdown("### 🧪 Solvent Blank Data (for Q<sub>dis</sub>)", unsafe_allow_html=True)
                 
                 solvent_source = st.radio(
                     "Solvent data:",
