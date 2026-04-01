@@ -6803,7 +6803,7 @@ def display_pce_tab():
                     st.metric("R²", f"{results['r_squared']:.4f}")
                 
                 # Display Q_dis information
-                st.markdown("### 🔥 Q<sub>dis</sub> (Solvent Heat Dissipation)")
+                st.markdown("### 🔥 Q<sub>dis</sub> (Solvent Heat Dissipation)", unsafe_allow_html=True)
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("ΔT Sample", f"{results['delta_T_sample']:.2f}°C")
@@ -7096,7 +7096,7 @@ def display_pce_tab():
                 st.markdown("#### 📊 Thermal Parameters")
                 st.write(f"**Time Constant (τ):** {results['tau_seconds']:.0f} seconds")
                 st.write(f"**hS Value:** {results['hS']:.4f} W/K")
-                st.write(f"**Q<sub>dis</sub>:** {results['Q_dis']:.4f} W")
+                st.write(f"**Q<sub>dis</sub>:** {results['Q_dis']:.4f} W", unsafe_allow_html=True)
             
             st.markdown("---")
             
