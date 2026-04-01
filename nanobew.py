@@ -6765,7 +6765,7 @@ def display_pce_tab():
             }
     
     # ========================================================================
-    # Tab 3: Analysis & Plots
+    # Tab 3: Analysis & Plots - UPDATED with Adaptive R²
     # ========================================================================
     with pce_tabs[2]:
         if 'pce_data' not in st.session_state:
@@ -6774,7 +6774,6 @@ def display_pce_tab():
             df = st.session_state['pce_data']
             params = st.session_state.get('pce_params', {})
             peak_idx = st.session_state.get('peak_idx', None)
-            solvent_data = st.session_state.get('solvent_data', None)
             
             if not params:
                 st.warning("⚠️ Please configure PCE parameters in the Parameters tab.")
@@ -6783,24 +6782,19 @@ def display_pce_tab():
             else:
                 st.markdown("### 📈 Photothermal Analysis with Adaptive R²")
                 
-                # Get solvent peak if available
-                solvent_peak_idx = None
-                if solvent_data is not None:
-                    solvent_peak_idx = solvent_data['temperature_°C'].idxmax()
-                
-                # Calculate PCE
-                results = calculate_pce_optimized(df, peak_idx, params, solvent_data, solvent_peak_idx)
+                # Calculate PCE using optimized adaptive method
+                results = calculate_pce_optimized_adaptive(df, peak_idx, params)
                 
                 # Display key metrics
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("PCE", f"{results['efficiency']:.1f}%")
+                    st.metric("ΔT Total", f"{results['delta_T']:.2f}°C")
                 with col2:
                     st.metric("ΔT Net", f"{results['delta_T_net']:.2f}°C")
                 with col3:
-                    st.metric("τ", f"{results['tau_seconds']:.0f} s")
+                    st.metric("Time Constant τ", f"{results['tau_seconds']:.0f} s")
                 with col4:
-                    st.metric("R²", f"{results['r_squared']:.4f}")
+                    st.metric("R² Value", f"{results['r_squared']:.4f}")
                 
                 # Display Q_dis information
                 st.markdown("### 🔥 Q<sub>dis</sub> (Solvent Heat Dissipation)", unsafe_allow_html=True)
@@ -6818,7 +6812,7 @@ def display_pce_tab():
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Display region info
+                # Display region info with emphasis on number of points used
                 opt = results['optimal_region']
                 st.info(f"✅ Adaptive linear region found: {opt['n_points']} points from "
                         f"{opt['start_time']:.1f} to {opt['end_time']:.1f} minutes "
@@ -6883,7 +6877,7 @@ def display_pce_tab():
                 
                 # Exponential fit
                 t_fit = np.linspace(0, cooling_data['time_from_peak'].max(), 100)
-                T_fit = params['ambient_temp'] + results['delta_T_sample'] * np.exp(-t_fit / results['tau_min'])
+                T_fit = params['ambient_temp'] + (peak_temp - params['ambient_temp']) * np.exp(-t_fit / results['tau_min'])
                 
                 fig2.add_trace(go.Scatter(
                     x=t_fit,
@@ -6916,12 +6910,6 @@ def display_pce_tab():
                         line_dash="dash",
                         line_color="red",
                         annotation_text=f"Selected: {opt['n_points']} pts"
-                    )
-                    fig3.add_hline(
-                        y=0.985,
-                        line_dash="dot",
-                        line_color="green",
-                        annotation_text="R² = 0.985 Threshold"
                     )
                     if results['r2_drop_point']:
                         fig3.add_vline(
@@ -6988,7 +6976,7 @@ def display_pce_tab():
                             cooling_analysis['time_from_peak'].values,
                             cooling_analysis['neg_ln_theta'].values,
                             min_points=5,
-                            r2_threshold=0.985
+                            r2_threshold=0.99
                         )
                         
                         st.info(f"✅ Optimal linear region in selected range: {opt_region['n_points']} points from "
@@ -7046,11 +7034,7 @@ def display_pce_tab():
                         with col2:
                             st.metric("Intercept", f"{opt_region['intercept']:.4f}")
                         with col3:
-                            if opt_region['slope'] > 0:
-                                tau_val = 1 / opt_region['slope']
-                                st.metric("Time Constant τ", f"{tau_val:.2f} mins")
-                            else:
-                                st.metric("Time Constant τ", "N/A (slope ≤ 0)")
+                            st.metric("Time Constant τ", f"{1/opt_region['slope']:.2f} mins")
                     else:
                         st.warning("Not enough data points in selected range for analysis.")
     
