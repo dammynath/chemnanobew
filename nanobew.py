@@ -6740,7 +6740,7 @@ def display_pce_tab():
                     max_value=50.0,
                     value=14.07,
                     step=0.1,
-                    format="%.2",
+                    format="%.1",
                     key="pce_solvent_manual",
                     help="Temperature rise of pure solvent (overrides loaded data)"
                 )
