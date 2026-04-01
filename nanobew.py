@@ -5895,27 +5895,17 @@ def display_advanced_visualization(uploaded_file):
                         mime="text/csv"
                     )
 # ============================================================================
-# TAB 6: PCE Analyzer - UPDATED with Adaptive R² (Maximizing Linear Points)
+# TAB 6: PCE Analyzer - COMPLETE WITH Q_dis AND FIXED ERROR HANDLING
 # ============================================================================
 
 def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.985):
     """
     Find the longest linear region in the -ln(theta) vs time plot that maintains high R².
     Adaptively extends the region while monitoring R² degradation.
-    
-    Parameters:
-    - time_values: array of time values (minutes)
-    - ln_theta_values: array of -ln(theta) values
-    - min_points: minimum number of points required for linear fit
-    - r2_threshold: minimum R² value to maintain (default 0.985)
-    
-    Returns:
-    - Dictionary with optimal region parameters
     """
     n_points = len(time_values)
     
     if n_points < min_points:
-        # Not enough points, use all data
         slope, intercept, r_value, _, _ = stats.linregress(time_values, ln_theta_values)
         return {
             'start_time': time_values[0],
@@ -5933,12 +5923,11 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     unique_indices = []
     seen_values = set()
     for i, val in enumerate(ln_theta_values):
-        rounded_val = round(val, 4)  # Round to 4 decimal places to detect duplicates
+        rounded_val = round(val, 4)
         if rounded_val not in seen_values:
             seen_values.add(rounded_val)
             unique_indices.append(i)
     
-    # If we removed duplicates, use unique indices
     if len(unique_indices) < n_points:
         time_unique = time_values[unique_indices]
         ln_theta_unique = ln_theta_values[unique_indices]
@@ -5949,7 +5938,6 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
         n_points_unique = n_points
         unique_indices = list(range(n_points))
     
-    # Initialize best_region with default values
     best_region = {
         'start_idx': 0,
         'end_idx': min_points - 1,
@@ -5962,12 +5950,11 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
         'method': 'initial'
     }
     
-    # Strategy 1: Start from the beginning (steepest part) and extend forward
-    for start_idx in range(0, min(n_points_unique - min_points, 20)):  # Try first 20 starting points
+    # Strategy 1: Forward extension from start
+    for start_idx in range(0, min(n_points_unique - min_points, 20)):
         current_r2 = 1.0
         end_idx = start_idx + min_points - 1
         
-        # Extend forward while R² stays above threshold
         while end_idx < n_points_unique - 1 and current_r2 >= r2_threshold:
             end_idx += 1
             x_window = time_unique[start_idx:end_idx+1]
@@ -5977,7 +5964,6 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
                 slope, intercept, r_value, _, _ = stats.linregress(x_window, y_window)
                 current_r2 = r_value**2
                 
-                # If this region is longer than our best, update best
                 if (end_idx - start_idx + 1) > best_region['n_points'] and current_r2 >= r2_threshold:
                     best_region = {
                         'start_idx': start_idx,
@@ -5993,13 +5979,12 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
             except:
                 break
     
-    # Strategy 2: If we couldn't find a long region, try backward from the end
+    # Strategy 2: Backward extension from end
     if best_region['n_points'] < min_points * 2:
-        for end_idx in range(n_points_unique - 1, max(n_points_unique - 21, min_points - 1), -1):  # Try last 20 points
+        for end_idx in range(n_points_unique - 1, max(n_points_unique - 21, min_points - 1), -1):
             current_r2 = 1.0
             start_idx = end_idx - min_points + 1
             
-            # Extend backward while R² stays above threshold
             while start_idx > 0 and current_r2 >= r2_threshold:
                 start_idx -= 1
                 x_window = time_unique[start_idx:end_idx+1]
@@ -6024,7 +6009,7 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
                 except:
                     break
     
-    # Strategy 3: If still no good region, use highest R² region with at least min_points
+    # Strategy 3: Highest R² region
     if best_region['n_points'] < min_points * 1.5:
         best_r2 = -1
         for start_idx in range(0, n_points_unique - min_points + 1, max(1, n_points_unique // 10)):
@@ -6052,7 +6037,7 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
                 except:
                     continue
     
-    # Map back to original indices if we used unique indices
+    # Map back to original indices
     if len(unique_indices) < len(time_values):
         best_region['start_idx'] = unique_indices[best_region['start_idx']]
         best_region['end_idx'] = unique_indices[best_region['end_idx']]
@@ -6062,58 +6047,45 @@ def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points
     return best_region
 
 
-def analyze_r2_progression(time_values, ln_theta_values, max_points=None):
+def calculate_pce_with_qdis(df, peak_idx, params, solvent_data=None, solvent_peak_idx=None):
     """
-    Analyze how R² changes as we add more points to the linear fit.
-    Returns the optimal number of points to use.
-    """
-    if max_points is None:
-        max_points = len(time_values)
+    Calculate photothermal conversion efficiency with Q_dis (solvent correction)
     
-    n_points = min(len(time_values), max_points)
-    r2_values = []
-    point_counts = []
-    
-    for i in range(5, n_points):  # Start with at least 5 points
-        x_window = time_values[:i]
-        y_window = ln_theta_values[:i]
-        
-        try:
-            _, _, r_value, _, _ = stats.linregress(x_window, y_window)
-            r2_values.append(r_value**2)
-            point_counts.append(i)
-        except:
-            pass
-    
-    return point_counts, r2_values
-
-
-def calculate_pce_optimized_adaptive(df, peak_idx, params):
-    """
-    Calculate photothermal conversion efficiency using adaptive linear region selection
-    that maximizes the number of linear points while maintaining high R².
+    The full equation is:
+    η = [hS × (ΔT_sample - ΔT_solvent)] / [I × (1 - 10^(-A_λ))] × 100%
+    where Q_dis = hS × ΔT_solvent accounts for heat dissipated by the solvent
     """
     
-    # Get peak information
+    # Get sample information
     peak_time = df.loc[peak_idx, 'time_mins']
     peak_temp = df.loc[peak_idx, 'temperature_°C']
     ambient_temp = params['ambient_temp']
     
-    # Calculate temperature difference
-    delta_T = peak_temp - ambient_temp
-    delta_T_net = delta_T - params['solvent_delta']
+    # Calculate sample temperature rise
+    delta_T_sample = peak_temp - ambient_temp
     
-    # Extract cooling data
+    # Get solvent temperature rise (Q_dis component)
+    if solvent_data is not None and solvent_peak_idx is not None:
+        solvent_peak_temp = solvent_data.loc[solvent_peak_idx, 'temperature_°C']
+        delta_T_solvent = solvent_peak_temp - ambient_temp
+    else:
+        # Use user-provided solvent delta if no solvent data
+        delta_T_solvent = params.get('solvent_delta', 3.5)
+    
+    # Net temperature rise (sample minus solvent)
+    delta_T_net = delta_T_sample - delta_T_solvent
+    
+    # Extract cooling data and calculate time constant
     cooling_data = df.iloc[peak_idx:].copy()
     cooling_data['time_from_peak'] = cooling_data['time_mins'] - peak_time
-    cooling_data['theta'] = (cooling_data['temperature_°C'] - ambient_temp) / (peak_temp - ambient_temp)
+    cooling_data['theta'] = (cooling_data['temperature_°C'] - ambient_temp) / delta_T_sample
     
-    # Remove points where theta is too small (noise region)
+    # Remove noise region
     cooling_data = cooling_data[cooling_data['theta'] > 0.01].copy()
     cooling_data['ln_theta'] = np.log(cooling_data['theta'])
-    cooling_data['neg_ln_theta'] = -cooling_data['ln_theta']  # -ln(theta)
+    cooling_data['neg_ln_theta'] = -cooling_data['ln_theta']
     
-    # Find optimal adaptive linear region
+    # Find optimal linear region
     optimal_region = find_optimal_linear_region_adaptive(
         cooling_data['time_from_peak'].values,
         cooling_data['neg_ln_theta'].values,
@@ -6121,20 +6093,28 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
         r2_threshold=0.985
     )
     
-    # Calculate tau from the optimal region slope
-    tau_min = 1 / optimal_region['slope'] if optimal_region['slope'] > 0 else 200
-    tau_seconds = tau_min * 60  # Convert to seconds
+    # Calculate tau from slope (τ = -1/slope)
+    if optimal_region['slope'] > 0:
+        tau_min = 1 / optimal_region['slope']
+    else:
+        tau_min = 200  # fallback value
     
-    # Calculate hS
+    tau_seconds = tau_min * 60
+    
+    # Calculate hS (heat transfer coefficient × surface area)
     hS = (params['mass'] * params['cp']) / tau_seconds  # W/K
     
     # Calculate absorbed power
-    absorbed_power = params['laser_power'] * (1 - 10**(-params['absorbance']))
+    P_absorbed = params['laser_power'] * (1 - 10**(-params['absorbance']))
     
-    # Calculate efficiency
-    efficiency = (hS * delta_T_net) / absorbed_power * 100
+    # Calculate Q_dis (heat dissipated by solvent)
+    Q_dis = hS * delta_T_solvent
     
-    # Determine expected range based on efficiency
+    # Calculate PCE with Q_dis correction
+    # η = [hS × (ΔT_sample - ΔT_solvent)] / P_absorbed × 100%
+    efficiency = (hS * delta_T_net) / P_absorbed * 100
+    
+    # Determine expected range
     if efficiency < 20:
         expected_range = "15-25% (Carbon Dots/Quantum Dots)"
     elif efficiency < 35:
@@ -6144,53 +6124,39 @@ def calculate_pce_optimized_adaptive(df, peak_idx, params):
     else:
         expected_range = ">55% (High performance AuNPs/Polymers)"
     
-    # Analyze R² progression
-    point_counts, r2_progression = analyze_r2_progression(
-        cooling_data['time_from_peak'].values[:50],  # First 50 points
-        cooling_data['neg_ln_theta'].values[:50]
-    )
-    
-    # Find where R² starts to drop significantly
-    r2_drop_point = None
-    if len(r2_progression) > 10:
-        for i in range(5, len(r2_progression)):
-            if r2_progression[i] < r2_progression[i-1] - 0.02:  # 2% drop
-                r2_drop_point = point_counts[i]
-                break
-    
     return {
         'efficiency': efficiency,
         'tau_min': tau_min,
         'tau_seconds': tau_seconds,
         'hS': hS,
-        'absorbed_power': absorbed_power,
+        'P_absorbed': P_absorbed,
+        'Q_dis': Q_dis,
         'r_squared': optimal_region['r_squared'],
         'slope': optimal_region['slope'],
         'intercept': optimal_region['intercept'],
-        'delta_T': delta_T,
+        'delta_T_sample': delta_T_sample,
+        'delta_T_solvent': delta_T_solvent,
         'delta_T_net': delta_T_net,
         'expected_range': expected_range,
         'optimal_region': optimal_region,
-        'cooling_data': cooling_data,
-        'point_counts': point_counts,
-        'r2_progression': r2_progression,
-        'r2_drop_point': r2_drop_point
+        'cooling_data': cooling_data
     }
 
 
 def display_pce_tab():
-    """Photothermal Conversion Efficiency Analysis Tab with Optimal R²"""
+    """Photothermal Conversion Efficiency Analysis Tab with Q_dis"""
     
     st.markdown("<h2 class='sub-header'>🔥 Photothermal Conversion Efficiency (PCE) Analyzer</h2>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class='info-box'>
-    Calculate photothermal conversion efficiency for quantum dots, metal nanoparticles, and carbon dots.
-    The algorithm automatically finds the optimal linear region of -ln(θ) vs time to maximize R² value.
+    <strong>Complete PCE Calculation with Q<sub>dis</sub> (Solvent Correction)</strong><br><br>
+    η = [hS × (ΔT<sub>sample</sub> - ΔT<sub>solvent</sub>)] / [I × (1 - 10<sup>-A<sub>λ</sub></sup>)] × 100%<br><br>
+    Where Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub> accounts for heat dissipated by the pure solvent.
     </div>
     """, unsafe_allow_html=True)
     
-    # Create tabs for different sections
+    # Create tabs
     pce_tabs = st.tabs([
         "📊 Data Input", 
         "⚙️ PCE Parameters", 
@@ -6210,449 +6176,135 @@ def display_pce_tab():
             
             data_source = st.radio(
                 "Select data source:",
-                ["Use Sample Data (26% PCE)", "Upload Custom CSV"],
+                ["Use Sample Data", "Upload Custom CSV"],
                 key="pce_data_source"
             )
             
             if data_source == "Upload Custom CSV":
-                uploaded_file = st.file_uploader(
-                    "Upload time-temperature CSV",
-                    type=['csv'],
-                    key="pce_uploader"
-                )
+                uploaded_file = st.file_uploader("Upload time-temperature CSV", type=['csv'], key="pce_uploader")
                 if uploaded_file is not None:
-                    # Try multiple encodings
                     encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'cp437']
                     df = None
-                    
                     for encoding in encodings:
                         try:
                             uploaded_file.seek(0)
                             df = pd.read_csv(uploaded_file, encoding=encoding)
                             st.success(f"✅ Loaded with {encoding} encoding")
                             break
-                        except UnicodeDecodeError:
-                            continue
-                        except Exception as e:
+                        except:
                             continue
                     
                     if df is None:
-                        st.error("Could not read file. Please check the file format.")
-                        df = None
+                        st.error("Could not read file. Please check the format.")
                     else:
-                        # Clean column names
                         df.columns = [col.replace('癈', '°C').replace('â', '°C') for col in df.columns]
-                        
-                        # Ensure correct column names
                         if len(df.columns) >= 2:
                             df.columns = ['time_mins', 'temperature_°C'] + list(df.columns[2:])
-                        
                         st.session_state['pce_data'] = df
                 else:
                     df = st.session_state.get('pce_data', None)
             else:
-                # Use sample data with proper encoding
-                sample_data = """time_mins,temperature_°C
-0,20
-0.5,21.8
-1,23.3
-1.5,24.8
-2,26.3
-2.5,27.6
-3,29
-3.5,30.2
-4,31.4
-4.5,32.7
-5,33.7
-5.5,34.8
-6,36
-6.5,36.8
-7,37.8
-7.5,38.6
-8,39.4
-8.5,40.4
-9,41.1
-9.5,41.8
-10,42.5
-10.5,43.2
-11,43.8
-11.5,44.4
-12,45.1
-12.5,45.7
-13,46.1
-13.5,46.8
-14,47.2
-14.5,47.7
-15,48.1
-15.5,48.6
-16,48.8
-16.5,49.3
-17,49.7
-17.5,49.9
-18,50.2
-18.5,50.6
-19,50.8
-19.5,51.1
-20,51.3
-20.5,51.6
-21,51.8
-21.5,52
-22,52.2
-22.5,52.5
-23,52.5
-23.5,52.8
-24,53
-24.5,53
-25,53.2
-25.5,53.3
-26,53.5
-26.5,53.5
-27,53.6
-27.5,53.6
-28,53.7
-28.5,53.9
-29,54
-29.5,54.1
-30,54.3
-30.5,54.3
-31,54.5
-31.5,54.5
-32,54.5
-32.5,54.7
-33,54.8
-33.5,54.8
-34,54.8
-34.5,54.8
-35,55
-35.5,55
-36,55.1
-36.5,55.2
-37,55.2
-37.5,55.3
-38,55.2
-38.5,55.2
-39,55.4
-39.5,55.6
-40,55.6
-40.5,55.6
-41,55.6
-41.5,53.3
-42,51.8
-42.5,50.5
-43,49.3
-43.5,47.8
-44,46.6
-44.5,45.6
-45,44.4
-45.5,43.3
-46,42.4
-46.5,41.5
-47,40.7
-47.5,39.7
-48,38.8
-48.5,38.2
-49,37.3
-49.5,36.7
-50,36
-50.5,35.5
-51,34.9
-51.5,34.3
-52,33.8
-52.5,33.3
-53,32.7
-53.5,32.3
-54,31.8
-54.5,31.3
-55,31
-55.5,30.7
-56,30.2
-56.5,29.9
-57,29.5
-57.5,29.1
-58,28.9
-58.5,28.6
-59,28.3
-59.5,28
-60,27.7
-60.5,27.5
-61,27.2
-61.5,26.8
-62,26.6
-62.5,26.6
-63,26.4
-63.5,26.2
-64,26
-64.5,25.8
-65,25.7
-65.5,25.5
-66,25.3
-66.5,25
-67,25
-67.5,25
-68,24.7
-68.5,24.6
-69,24.4
-69.5,24.4
-70,24.2
-70.5,24.1
-71,24.1
-71.5,23.8
-72,23.8
-72.5,23.7
-73,23.6
-73.5,23.6
-74,23.3
-74.5,23.3
-75,23.3
-75.5,23.2
-76,23.2
-76.5,23
-77,23
-77.5,23
-78,22.9
-78.5,22.8
-79,22.8
-79.5,22.7
-80,22.7
-80.5,22.7
-81,22.7
-81.5,22.6
-82,22.5
-82.5,22.5
-83,22.3
-83.5,22.2
-84,22.3
-84.5,22.3
-85,22.2
-85.5,22.2
-86,22.1
-86.5,22.2
-87,22.2
-87.5,22.1
-88,21.9
-88.5,21.9
-89,21.9
-89.5,21.7
-90,21.7
-90.5,21.6
-91,21.5
-91.5,21.5
-92,21.5
-92.5,21.3
-93,21.3
-93.5,21.2
-94,21.1
-94.5,21.1
-95,21.1
-95.5,20
-96,20
-96.5,20
-97,20"""
-                
-                df = pd.read_csv(io.StringIO(sample_data))
-                st.info("📊 Using sample data (expected PCE: 26%)")
+                # Generate sample data
+                time_mins = np.linspace(0, 30, 61)
+                temp_rise = 20 + 25 * (1 - np.exp(-time_mins / 8))
+                temp_cool = 45 * np.exp(-(time_mins - 15) / 6) + 20
+                temp_cool[time_mins < 15] = np.nan
+                df = pd.DataFrame({
+                    'time_mins': time_mins,
+                    'temperature_°C': np.where(~np.isnan(temp_cool), temp_cool, temp_rise)
+                }).dropna().reset_index(drop=True)
                 st.session_state['pce_data'] = df
+                st.info("📊 Using sample data")
             
             if df is not None:
-                st.session_state['pce_data'] = df
-                
-                # Display raw data
-                st.markdown("### 👁️ Data Preview")
                 st.dataframe(df.head(10), use_container_width=True)
                 
-                # Data statistics
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Total Time Points", len(df))
+                    st.metric("Total Points", len(df))
                 with col2:
-                    st.metric("Max Temperature", f"{df['temperature_°C'].max():.1f}°C")
+                    st.metric("Max Temp", f"{df['temperature_°C'].max():.1f}°C")
                 with col3:
-                    st.metric("Min Temperature", f"{df['temperature_°C'].min():.1f}°C")
+                    st.metric("Min Temp", f"{df['temperature_°C'].min():.1f}°C")
         
         with col2:
-            if df is not None:
-                st.markdown("### 📈 Raw Data Plot")
-                
-                # Identify heating and cooling phases
-                temp_peak_idx = df['temperature_°C'].idxmax()
-                peak_time = df.loc[temp_peak_idx, 'time_mins']
-                peak_temp = df.loc[temp_peak_idx, 'temperature_°C']
-                
-                fig = go.Figure()
-                
-                # Heating phase
-                fig.add_trace(go.Scatter(
-                    x=df['time_mins'].iloc[:temp_peak_idx+1],
-                    y=df['temperature_°C'].iloc[:temp_peak_idx+1],
-                    mode='lines+markers',
-                    name='Heating Phase',
-                    line=dict(color='red', width=2),
-                    marker=dict(size=4)
-                ))
-                
-                # Cooling phase
-                fig.add_trace(go.Scatter(
-                    x=df['time_mins'].iloc[temp_peak_idx:],
-                    y=df['temperature_°C'].iloc[temp_peak_idx:],
-                    mode='lines+markers',
-                    name='Cooling Phase',
-                    line=dict(color='blue', width=2),
-                    marker=dict(size=4)
-                ))
-                
-                # Mark peak
-                fig.add_trace(go.Scatter(
-                    x=[peak_time],
-                    y=[peak_temp],
-                    mode='markers',
-                    name=f'Peak: {peak_temp:.1f}°C',
-                    marker=dict(color='green', size=12, symbol='star')
-                ))
-                
-                fig.update_layout(
-                    title="Temperature Profile (Heating & Cooling)",
-                    xaxis_title="Time (mins)",
-                    yaxis_title="Temperature (°C)",
-                    hovermode='x unified',
-                    height=400
+            st.markdown("### 🧪 Solvent Blank Data (for Q<sub>dis</sub>)")
+            
+            solvent_source = st.radio(
+                "Solvent data:",
+                ["Use Estimated ΔT", "Upload Solvent CSV"],
+                key="solvent_source"
+            )
+            
+            if solvent_source == "Upload Solvent CSV":
+                solvent_file = st.file_uploader("Upload solvent CSV", type=['csv'], key="solvent_upload")
+                if solvent_file is not None:
+                    try:
+                        solvent_df = pd.read_csv(solvent_file)
+                        solvent_df.columns = [col.replace('癈', '°C') for col in solvent_df.columns]
+                        if len(solvent_df.columns) >= 2:
+                            solvent_df.columns = ['time_mins', 'temperature_°C']
+                        st.session_state['solvent_data'] = solvent_df
+                        st.success("✅ Solvent data loaded")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+            else:
+                # Use estimated ΔT
+                st.session_state['solvent_data'] = None
+                st.session_state['solvent_delta_estimate'] = st.number_input(
+                    "Estimated Solvent ΔT (°C)", 0.0, 20.0, 3.5, step=0.5,
+                    help="Maximum temperature rise of pure solvent"
                 )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Store peak information
-                st.session_state['peak_idx'] = temp_peak_idx
-                st.session_state['peak_time'] = peak_time
-                st.session_state['peak_temp'] = peak_temp
+            
+            if st.session_state.get('solvent_data') is not None:
+                solvent_df = st.session_state['solvent_data']
+                st.dataframe(solvent_df.head(5), use_container_width=True)
+                peak_idx = solvent_df['temperature_°C'].idxmax()
+                st.metric("Solvent Peak Temp", f"{solvent_df.loc[peak_idx, 'temperature_°C']:.1f}°C")
     
     # ========================================================================
     # Tab 2: PCE Parameters
     # ========================================================================
     with pce_tabs[1]:
-        st.markdown("### ⚙️ Photothermal Conversion Efficiency Parameters")
+        st.markdown("### ⚙️ Experimental Parameters")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### Material Properties")
-            
-            material_type = st.selectbox(
-                "Material Type",
-                ["Quantum Dots", "Metal Nanoparticles", "Carbon Dots", "Other"],
-                key="pce_material"
-            )
-            
-            mass = st.number_input(
-                "Sample Mass (g)",
-                min_value=0.001,
-                max_value=100.0,
-                value=1.0,
-                step=0.1,
-                format="%.3f",
-                key="pce_mass"
-            )
-            
-            cp_value = st.number_input(
-                "Specific Heat Capacity (J/g·K)",
-                min_value=0.1,
-                max_value=10.0,
-                value=4.184,
-                step=0.01,
-                format="%.3f",
-                key="pce_cp",
-                help="Default 4.184 J/g·K for water"
-            )
+            st.markdown("#### Sample Properties")
+            mass = st.number_input("Sample Mass (g)", 0.001, 100.0, 1.0, step=0.1, format="%.3f")
+            cp = st.number_input("Specific Heat (J/g·K)", 0.1, 10.0, 4.184, step=0.01)
             
             st.markdown("#### Laser Parameters")
-            
-            laser_power = st.number_input(
-                "Laser Power (W)",
-                min_value=0.001,
-                max_value=10.0,
-                value=1.0,
-                step=0.1,
-                format="%.3f",
-                key="pce_power"
-            )
-            
-            spot_area = st.number_input(
-                "Laser Spot Area (cm²)",
-                min_value=0.01,
-                max_value=10.0,
-                value=0.50265,
-                step=0.1,
-                format="%.3f",
-                key="pce_area"
-            )
-            
-            power_density = laser_power / spot_area
-            st.metric("Power Density", f"{power_density:.2f} W/cm²")
+            laser_power = st.number_input("Laser Power (W)", 0.01, 10.0, 1.0, step=0.1)
+            absorbance = st.number_input("Absorbance at λ", 0.01, 5.0, 0.5, step=0.05)
+            ambient_temp = st.number_input("Ambient Temp (°C)", 15, 35, 25, step=0.5)
         
         with col2:
-            st.markdown("#### Optical Properties")
+            st.markdown("#### Additional Parameters")
+            spot_area = st.number_input("Spot Area (cm²)", 0.01, 10.0, 0.50265, step=0.1)
+            power_density = laser_power / spot_area if spot_area > 0 else 0
+            st.metric("Power Density", f"{power_density:.2f} W/cm²")
             
-            absorbance = st.number_input(
-                "Absorbance at Laser Wavelength",
-                min_value=0.01,
-                max_value=5.0,
-                value=0.5,
-                step=0.05,
-                format="%.2f",
-                key="pce_absorbance",
-                help="A = -log10(I/I₀)"
-            )
-            
-            laser_wavelength = st.number_input(
-                "Laser Wavelength (nm)",
-                min_value=300,
-                max_value=2000,
-                value=808,
-                step=10,
-                key="pce_wavelength"
-            )
-            
-            st.markdown("#### Environmental Parameters")
-            
-            ambient_temp = st.number_input(
-                "Ambient Temperature (°C)",
-                min_value=0.0,
-                max_value=50.0,
-                value=20.0,
-                step=0.1,
-                key="pce_ambient"
-            )
-            
-            solvent_blank_delta = st.number_input(
-                "Solvent Blank ΔT (°C)",
-                min_value=0.0,
-                max_value=20.0,
-                value=3.5,
-                step=0.1,
-                format="%.3f",
-                key="pce_solvent",
-                help="Temperature rise of pure water or solvent under same conditions"
-            )
-            
-            # Calculate absorbed power
-            absorbed_power = laser_power * (1 - 10**(-absorbance))
-            st.metric("Absorbed Power", f"{absorbed_power:.3f} W")
-            
-            # Store parameters
-            st.session_state['pce_params'] = {
-                'material': material_type,
-                'mass': mass,
-                'cp': cp_value,
-                'laser_power': laser_power,
-                'spot_area': spot_area,
-                'power_density': power_density,
-                'absorbance': absorbance,
-                'wavelength': laser_wavelength,
-                'ambient_temp': ambient_temp,
-                'solvent_delta': solvent_blank_delta,
-                'absorbed_power': absorbed_power
-            }
+            st.markdown("#### Solvent Correction")
+            if st.session_state.get('solvent_data') is None:
+                solvent_delta = st.number_input("Solvent ΔT (°C)", 0.0, 20.0, 3.5, step=0.5)
+            else:
+                solvent_delta = None
+        
+        params = {
+            'mass': mass,
+            'cp': cp,
+            'laser_power': laser_power,
+            'absorbance': absorbance,
+            'ambient_temp': ambient_temp,
+            'spot_area': spot_area,
+            'solvent_delta': solvent_delta if solvent_delta else 3.5
+        }
+        st.session_state['pce_params'] = params
     
     # ========================================================================
-    # Tab 3: Analysis & Plots - UPDATED with Adaptive R²
+    # Tab 3: Analysis & Plots - WITH Q_dis
     # ========================================================================
     with pce_tabs[2]:
         if 'pce_data' not in st.session_state:
@@ -6660,148 +6312,91 @@ def display_pce_tab():
         else:
             df = st.session_state['pce_data']
             params = st.session_state.get('pce_params', {})
-            peak_idx = st.session_state.get('peak_idx', None)
+            peak_idx = df['temperature_°C'].idxmax()
+            solvent_data = st.session_state.get('solvent_data', None)
             
             if not params:
                 st.warning("⚠️ Please configure PCE parameters in the Parameters tab.")
-            elif peak_idx is None:
-                st.warning("⚠️ Peak temperature not identified. Please check data.")
             else:
-                st.markdown("### 📈 Photothermal Analysis with Adaptive R²")
+                st.markdown("### 📈 Photothermal Analysis with Q<sub>dis</sub>")
                 
-                # Calculate PCE using optimized adaptive method
-                results = calculate_pce_optimized_adaptive(df, peak_idx, params)
+                # Get solvent peak if available
+                solvent_peak_idx = None
+                if solvent_data is not None:
+                    solvent_peak_idx = solvent_data['temperature_°C'].idxmax()
+                
+                # Calculate PCE with Q_dis
+                results = calculate_pce_with_qdis(df, peak_idx, params, solvent_data, solvent_peak_idx)
                 
                 # Display key metrics
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("ΔT Total", f"{results['delta_T']:.2f}°C")
+                    st.metric("PCE", f"{results['efficiency']:.1f}%")
                 with col2:
-                    st.metric("ΔT Net", f"{results['delta_T_net']:.2f}°C")
+                    st.metric("τ", f"{results['tau_seconds']:.0f} s")
                 with col3:
-                    st.metric("Time Constant τ", f"{results['tau_seconds']:.0f} s")
+                    st.metric("R²", f"{results['r_squared']:.4f}")
                 with col4:
-                    st.metric("R² Value", f"{results['r_squared']:.4f}")
+                    st.metric("hS", f"{results['hS']:.4f} W/K")
                 
-                # Display region info with emphasis on number of points used
+                # Q_dis display
+                st.markdown("### 🔥 Q<sub>dis</sub> (Solvent Heat Dissipation)")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("ΔT Sample", f"{results['delta_T_sample']:.2f}°C")
+                with col2:
+                    st.metric("ΔT Solvent", f"{results['delta_T_solvent']:.2f}°C")
+                with col3:
+                    st.metric("ΔT Net", f"{results['delta_T_net']:.2f}°C")
+                
+                st.markdown(f"""
+                <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;'>
+                    <strong>Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub></strong> = {results['hS']:.4f} W/K × {results['delta_T_solvent']:.2f}°C = <strong>{results['Q_dis']:.4f} W</strong>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Region info
                 opt = results['optimal_region']
-                st.info(f"✅ Adaptive linear region found: {opt['n_points']} points from "
-                        f"{opt['start_time']:.1f} to {opt['end_time']:.1f} minutes "
-                        f"with R² = {opt['r_squared']:.4f} (method: {opt['method']})")
+                st.info(f"✅ Optimal linear region: {opt['n_points']} points from {opt['start_time']:.1f} to {opt['end_time']:.1f} min, R² = {opt['r_squared']:.4f}")
                 
-                # Plot 1: -ln(θ) vs time with optimal region highlighted
-                fig1 = go.Figure()
-                
+                # Plot 1: -ln(θ) vs time
                 cooling_data = results['cooling_data']
+                fig1 = go.Figure()
+                fig1.add_trace(go.Scatter(x=cooling_data['time_from_peak'], y=cooling_data['neg_ln_theta'],
+                                         mode='markers', name='Data', marker=dict(color='lightblue', size=6)))
                 
-                # All data points
-                fig1.add_trace(go.Scatter(
-                    x=cooling_data['time_from_peak'],
-                    y=cooling_data['neg_ln_theta'],
-                    mode='markers',
-                    name='All Data',
-                    marker=dict(color='lightblue', size=6, opacity=0.5)
-                ))
-                
-                # Highlight optimal region
                 mask = (cooling_data.index >= opt['start_idx']) & (cooling_data.index <= opt['end_idx'])
+                fig1.add_trace(go.Scatter(x=cooling_data.loc[mask, 'time_from_peak'], y=cooling_data.loc[mask, 'neg_ln_theta'],
+                                         mode='markers', name=f'Optimal Region ({opt["n_points"]} pts)',
+                                         marker=dict(color='red', size=8)))
                 
-                fig1.add_trace(go.Scatter(
-                    x=cooling_data.loc[mask, 'time_from_peak'],
-                    y=cooling_data.loc[mask, 'neg_ln_theta'],
-                    mode='markers',
-                    name=f'Optimal Region ({opt["n_points"]} pts)',
-                    marker=dict(color='red', size=8)
-                ))
-                
-                # Linear fit line
                 x_line = np.linspace(opt['start_time'], opt['end_time'], 100)
                 y_line = opt['slope'] * x_line + opt['intercept']
-                
-                fig1.add_trace(go.Scatter(
-                    x=x_line,
-                    y=y_line,
-                    mode='lines',
-                    name=f'Linear Fit (R² = {opt["r_squared"]:.4f})',
-                    line=dict(color='red', width=3)
-                ))
-                
-                fig1.update_layout(
-                    title=f"-ln(θ) vs Time (Optimal Region: {opt['start_time']:.1f}-{opt['end_time']:.1f} min)",
-                    xaxis_title="Time from Peak (minutes)",
-                    yaxis_title="-ln(θ)",
-                    height=400
-                )
+                fig1.add_trace(go.Scatter(x=x_line, y=y_line, mode='lines',
+                                         name=f'Fit: y={opt["slope"]:.4f}x+{opt["intercept"]:.4f}',
+                                         line=dict(color='red', width=2)))
+                fig1.update_layout(title=f"-ln(θ) vs Time (R² = {opt['r_squared']:.4f})",
+                                  xaxis_title="Time from Peak (min)", yaxis_title="-ln(θ)", height=400)
                 st.plotly_chart(fig1, use_container_width=True)
                 
-                # Plot 2: Cooling curve with exponential fit
+                # Plot 2: Cooling curve
                 fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=cooling_data['time_from_peak'], y=cooling_data['temperature_°C'],
+                                         mode='markers', name='Experimental', marker=dict(color='blue', size=6)))
                 
-                # Raw cooling data
-                fig2.add_trace(go.Scatter(
-                    x=cooling_data['time_from_peak'],
-                    y=cooling_data['temperature_°C'],
-                    mode='markers',
-                    name='Experimental',
-                    marker=dict(color='blue', size=6)
-                ))
-                
-                # Exponential fit
                 t_fit = np.linspace(0, cooling_data['time_from_peak'].max(), 100)
-                T_fit = params['ambient_temp'] + (peak_temp - params['ambient_temp']) * np.exp(-t_fit / results['tau_min'])
-                
-                fig2.add_trace(go.Scatter(
-                    x=t_fit,
-                    y=T_fit,
-                    mode='lines',
-                    name=f'Exponential Fit (τ={results["tau_seconds"]:.0f}s)',
-                    line=dict(color='red', width=2)
-                ))
-                
-                fig2.update_layout(
-                    title="Cooling Curve with Exponential Fit",
-                    xaxis_title="Time from Peak (minutes)",
-                    yaxis_title="Temperature (°C)",
-                    height=400
-                )
+                T_fit = params['ambient_temp'] + results['delta_T_sample'] * np.exp(-t_fit / results['tau_min'])
+                fig2.add_trace(go.Scatter(x=t_fit, y=T_fit, mode='lines',
+                                         name=f'Fit (τ={results["tau_seconds"]:.0f}s)',
+                                         line=dict(color='red', width=2)))
+                fig2.update_layout(title="Cooling Curve with Exponential Fit",
+                                  xaxis_title="Time from Peak (min)", yaxis_title="Temperature (°C)", height=400)
                 st.plotly_chart(fig2, use_container_width=True)
                 
-                # Plot 3: R² progression
-                if results['point_counts'] and results['r2_progression']:
-                    fig3 = go.Figure()
-                    fig3.add_trace(go.Scatter(
-                        x=results['point_counts'],
-                        y=results['r2_progression'],
-                        mode='lines+markers',
-                        name='R² vs Points',
-                        line=dict(color='purple', width=2)
-                    ))
-                    fig3.add_hline(
-                        y=opt['r_squared'],
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text=f"Selected: {opt['n_points']} pts"
-                    )
-                    if results['r2_drop_point']:
-                        fig3.add_vline(
-                            x=results['r2_drop_point'],
-                            line_dash="dot",
-                            line_color="orange",
-                            annotation_text=f"Drop at {results['r2_drop_point']} pts"
-                        )
-                    fig3.update_layout(
-                        title="R² vs Number of Points (Finding Optimal Length)",
-                        xaxis_title="Number of Points",
-                        yaxis_title="R² Value",
-                        height=300
-                    )
-                    st.plotly_chart(fig3, use_container_width=True)
-                
-                # Store results
                 st.session_state['pce_results'] = results
     
     # ========================================================================
-    # Tab 4: Cooling Curve Analysis
+    # Tab 4: Cooling Curve Analysis - FIXED
     # ========================================================================
     with pce_tabs[3]:
         if 'pce_data' not in st.session_state:
@@ -6809,108 +6404,67 @@ def display_pce_tab():
         else:
             df = st.session_state['pce_data']
             params = st.session_state.get('pce_params', {})
-            peak_idx = st.session_state.get('peak_idx', None)
+            peak_idx = df['temperature_°C'].idxmax()
             
             st.markdown("### 📉 Detailed Cooling Curve Analysis")
             
-            if peak_idx is not None:
-                # User selects cooling range
-                cooling_start = st.slider(
-                    "Cooling Start Index",
-                    min_value=peak_idx,
-                    max_value=len(df)-1,
-                    value=peak_idx,
-                    key="cooling_start"
-                )
+            cooling_start = st.slider("Cooling Start Index", peak_idx, len(df)-1, peak_idx, key="cooling_start")
+            cooling_end = st.slider("Cooling End Index", cooling_start, len(df)-1, len(df)-1, key="cooling_end")
+            
+            if params:
+                cooling_analysis = df.iloc[cooling_start:cooling_end+1].copy()
+                peak_time = df.loc[peak_idx, 'time_mins']
+                peak_temp = df.loc[peak_idx, 'temperature_°C']
                 
-                cooling_end = st.slider(
-                    "Cooling End Index",
-                    min_value=cooling_start,
-                    max_value=len(df)-1,
-                    value=len(df)-1,
-                    key="cooling_end"
-                )
+                cooling_analysis['time_from_peak'] = cooling_analysis['time_mins'] - peak_time
+                cooling_analysis['theta'] = (cooling_analysis['temperature_°C'] - params['ambient_temp']) / (peak_temp - params['ambient_temp'])
+                cooling_analysis = cooling_analysis[cooling_analysis['theta'] > 0.01].copy()
+                cooling_analysis['neg_ln_theta'] = -np.log(cooling_analysis['theta'])
                 
-                if params:
-                    cooling_analysis = df.iloc[cooling_start:cooling_end+1].copy()
-                    peak_time = df.loc[peak_idx, 'time_mins']
-                    peak_temp = df.loc[peak_idx, 'temperature_°C']
+                if len(cooling_analysis) > 5:
+                    opt_region = find_optimal_linear_region_adaptive(
+                        cooling_analysis['time_from_peak'].values,
+                        cooling_analysis['neg_ln_theta'].values,
+                        min_points=5,
+                        r2_threshold=0.99
+                    )
                     
-                    cooling_analysis['time_from_peak'] = cooling_analysis['time_mins'] - peak_time
-                    cooling_analysis['theta'] = (cooling_analysis['temperature_°C'] - params['ambient_temp']) / (peak_temp - params['ambient_temp'])
-                    cooling_analysis = cooling_analysis[cooling_analysis['theta'] > 0.01].copy()
-                    cooling_analysis['neg_ln_theta'] = -np.log(cooling_analysis['theta'])
+                    st.info(f"✅ Optimal region: {opt_region['n_points']} points from "
+                           f"{opt_region['start_time']:.1f} to {opt_region['end_time']:.1f} min, "
+                           f"R² = {opt_region['r_squared']:.4f}")
                     
-                    # Find optimal linear region for this selected range
-                    if len(cooling_analysis) > 5:
-                        opt_region = find_optimal_linear_region_adaptive(
-                            cooling_analysis['time_from_peak'].values,
-                            cooling_analysis['neg_ln_theta'].values,
-                            min_points=5,
-                            r2_threshold=0.99
-                        )
-                        
-                        st.info(f"✅ Optimal linear region in selected range: {opt_region['n_points']} points from "
-                               f"{opt_region['start_time']:.1f} to {opt_region['end_time']:.1f} minutes "
-                               f"with R² = {opt_region['r_squared']:.4f}")
-                        
-                        # Plot with optimal region
-                        fig = go.Figure()
-                        
-                        # All data
-                        fig.add_trace(go.Scatter(
-                            x=cooling_analysis['time_from_peak'],
-                            y=cooling_analysis['neg_ln_theta'],
-                            mode='markers',
-                            name='All Data',
-                            marker=dict(color='lightblue', size=6)
-                        ))
-                        
-                        # Highlight optimal region
-                        mask = (cooling_analysis['time_from_peak'] >= opt_region['start_time']) & \
-                               (cooling_analysis['time_from_peak'] <= opt_region['end_time'])
-                        
-                        fig.add_trace(go.Scatter(
-                            x=cooling_analysis.loc[mask, 'time_from_peak'],
-                            y=cooling_analysis.loc[mask, 'neg_ln_theta'],
-                            mode='markers',
-                            name='Optimal Region',
-                            marker=dict(color='red', size=8)
-                        ))
-                        
-                        # Linear fit
-                        x_line = np.linspace(opt_region['start_time'], opt_region['end_time'], 100)
-                        y_line = opt_region['slope'] * x_line + opt_region['intercept']
-                        
-                        fig.add_trace(go.Scatter(
-                            x=x_line,
-                            y=y_line,
-                            mode='lines',
-                            name=f'Fit: y={opt_region["slope"]:.4f}x+{opt_region["intercept"]:.4f}',
-                            line=dict(color='red', width=2)
-                        ))
-                        
-                        fig.update_layout(
-                            title=f"-ln(θ) vs Time (Optimal R² = {opt_region['r_squared']:.4f})",
-                            xaxis_title="Time from Peak (minutes)",
-                            yaxis_title="-ln(θ)",
-                            height=500
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Display fit parameters
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Slope", f"{opt_region['slope']:.4f}")
-                        with col2:
-                            st.metric("Intercept", f"{opt_region['intercept']:.4f}")
-                        with col3:
-                            st.metric("Time Constant τ", f"{1/opt_region['slope']:.2f} mins")
-                    else:
-                        st.warning("Not enough data points in selected range for analysis.")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=cooling_analysis['time_from_peak'], y=cooling_analysis['neg_ln_theta'],
+                                            mode='markers', name='Data', marker=dict(color='lightblue', size=6)))
+                    
+                    mask = (cooling_analysis['time_from_peak'] >= opt_region['start_time']) & \
+                           (cooling_analysis['time_from_peak'] <= opt_region['end_time'])
+                    fig.add_trace(go.Scatter(x=cooling_analysis.loc[mask, 'time_from_peak'], y=cooling_analysis.loc[mask, 'neg_ln_theta'],
+                                            mode='markers', name='Optimal Region', marker=dict(color='red', size=8)))
+                    
+                    x_line = np.linspace(opt_region['start_time'], opt_region['end_time'], 100)
+                    y_line = opt_region['slope'] * x_line + opt_region['intercept']
+                    fig.add_trace(go.Scatter(x=x_line, y=y_line, mode='lines',
+                                            name=f'Fit: y={opt_region["slope"]:.4f}x+{opt_region["intercept"]:.4f}',
+                                            line=dict(color='red', width=2)))
+                    fig.update_layout(title=f"-ln(θ) vs Time (R² = {opt_region['r_squared']:.4f})",
+                                     xaxis_title="Time from Peak (min)", yaxis_title="-ln(θ)", height=500)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Slope", f"{opt_region['slope']:.4f}")
+                    with col2:
+                        st.metric("Intercept", f"{opt_region['intercept']:.4f}")
+                    with col3:
+                        # FIXED: Handle slope = 0 case
+                        tau_val = 1 / opt_region['slope'] if opt_region['slope'] > 0 else float('inf')
+                        st.metric("Time Constant τ", f"{tau_val:.2f} mins" if tau_val != float('inf') else "N/A")
+                else:
+                    st.warning("Not enough data points in selected range.")
     
     # ========================================================================
-    # Tab 5: Results Summary
+    # Tab 5: Results Summary - WITH Q_dis
     # ========================================================================
     with pce_tabs[4]:
         st.markdown("### 📋 Photothermal Conversion Efficiency Results")
@@ -6920,62 +6474,51 @@ def display_pce_tab():
         else:
             results = st.session_state['pce_results']
             params = st.session_state.get('pce_params', {})
+            opt = results['optimal_region']
             
-            # Display results in a nice format
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("#### 🔬 Material Information")
-                st.write(f"**Material Type:** {params.get('material', 'N/A')}")
-                st.write(f"**Sample Mass:** {params.get('mass', 0):.3f} g")
+                st.markdown("#### 🔬 Sample Parameters")
+                st.write(f"**Mass:** {params.get('mass', 0):.3f} g")
                 st.write(f"**Specific Heat:** {params.get('cp', 0):.2f} J/g·K")
-                st.write(f"**Laser Wavelength:** {params.get('wavelength', 0)} nm")
+                st.write(f"**Laser Power:** {params.get('laser_power', 0):.2f} W")
                 st.write(f"**Absorbance:** {params.get('absorbance', 0):.2f}")
                 
-                st.markdown("#### 📐 Geometric Parameters")
-                st.write(f"**Laser Power:** {params.get('laser_power', 0):.2f} W")
-                st.write(f"**Spot Area:** {params.get('spot_area', 0):.2f} cm²")
-                st.write(f"**Power Density:** {params.get('power_density', 0):.2f} W/cm²")
-                st.write(f"**Absorbed Power:** {results['absorbed_power']:.3f} W")
+                st.markdown("#### 📐 Thermal Parameters")
+                st.write(f"**Time Constant τ:** {results['tau_seconds']:.0f} s")
+                st.write(f"**hS Value:** {results['hS']:.4f} W/K")
+                st.write(f"**R² Value:** {results['r_squared']:.4f}")
             
             with col2:
-                st.markdown("#### 📈 Optimal Linear Region Parameters")
-                opt = results['optimal_region']
-                st.write(f"**Region Start:** {opt['start_time']:.2f} mins")
-                st.write(f"**Region End:** {opt['end_time']:.2f} mins")
-                st.write(f"**Number of Points:** {opt['n_points']}")
-                st.write(f"**Slope:** {opt['slope']:.4f}")
-                st.write(f"**Intercept:** {opt['intercept']:.4f}")
-                st.write(f"**R² Value:** {opt['r_squared']:.4f}")
-                st.write(f"**Method:** {opt['method']}")
-                
-                st.markdown("#### 📊 Thermal Parameters")
-                st.write(f"**Time Constant (τ):** {results['tau_min']:.3f} mins")
-                st.write(f"**Time Constant (τ):** {results['tau_seconds']:.0f} seconds")
-                st.write(f"**hS Value:** {results['hS']:.4f} W/K")
+                st.markdown("#### 🌡️ Temperature Data")
+                st.write(f"**ΔT Sample:** {results['delta_T_sample']:.2f}°C")
+                st.write(f"**ΔT Solvent:** {results['delta_T_solvent']:.2f}°C")
                 st.write(f"**ΔT Net:** {results['delta_T_net']:.2f}°C")
+                
+                st.markdown("#### 🔥 Q<sub>dis</sub> Calculation")
+                st.write(f"**Q<sub>dis</sub> = hS × ΔT<sub>solvent</sub>**")
+                st.write(f"**Q<sub>dis</sub>:** {results['Q_dis']:.4f} W")
+                st.write(f"**P<sub>absorbed</sub>:** {results['P_absorbed']:.3f} W")
             
             st.markdown("---")
             
             # Main PCE result
-            st.markdown("### 🎯 Photothermal Conversion Efficiency")
-            
-            # Create a big metric display
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 st.markdown(f"""
                 <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 1rem;'>
                     <h1 style='color: white; font-size: 4rem;'>{results['efficiency']:.1f}%</h1>
-                    <p style='color: white; font-size: 1.2rem;'>Photothermal Conversion Efficiency</p>                    
+                    <p style='color: white; font-size: 1.2rem;'>Photothermal Conversion Efficiency</p>
+                    <p style='color: white; font-size: 1rem;'>{results['expected_range']}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Comparison with expected value (26%)
+            # Validation
             expected_pce = 26.0
             difference = abs(results['efficiency'] - expected_pce)
             percent_diff = (difference / expected_pce) * 100
             
-            st.markdown("#### 📊 Validation")
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Calculated PCE", f"{results['efficiency']:.2f}%")
@@ -6985,71 +6528,19 @@ def display_pce_tab():
                 delta_symbol = "↓" if results['efficiency'] < expected_pce else "↑"
                 st.metric("Difference", f"{difference:.2f}%", delta=f"{delta_symbol} {percent_diff:.1f}%")
             
-            # Export results
-            st.markdown("#### 📥 Export Results")
-            
-            # Create results dictionary for export
+            # Export
             export_data = {
-                'Parameter': [],
-                'Value': [],
-                'Unit': []
+                'Parameter': ['PCE (%)', 'τ (s)', 'hS (W/K)', 'R²', 'Q_dis (W)', 'P_absorbed (W)',
+                              'ΔT Sample (°C)', 'ΔT Solvent (°C)', 'ΔT Net (°C)'],
+                'Value': [results['efficiency'], results['tau_seconds'], results['hS'], results['r_squared'],
+                          results['Q_dis'], results['P_absorbed'], results['delta_T_sample'],
+                          results['delta_T_solvent'], results['delta_T_net']]
             }
-            
-            # Add material parameters
-            for key, value in params.items():
-                if isinstance(value, (int, float)):
-                    export_data['Parameter'].append(key.replace('_', ' ').title())
-                    export_data['Value'].append(value)
-                    export_data['Unit'].append('')
-            
-            # Add optimal region parameters
-            export_data['Parameter'].append('Optimal Region Start')
-            export_data['Value'].append(opt['start_time'])
-            export_data['Unit'].append('mins')
-            
-            export_data['Parameter'].append('Optimal Region End')
-            export_data['Value'].append(opt['end_time'])
-            export_data['Unit'].append('mins')
-            
-            export_data['Parameter'].append('Optimal Region Points')
-            export_data['Value'].append(opt['n_points'])
-            export_data['Unit'].append('')
-            
-            export_data['Parameter'].append('Linear Fit Slope')
-            export_data['Value'].append(opt['slope'])
-            export_data['Unit'].append('min⁻¹')
-            
-            export_data['Parameter'].append('Linear Fit Intercept')
-            export_data['Value'].append(opt['intercept'])
-            export_data['Unit'].append('')
-            
-            export_data['Parameter'].append('R² Value')
-            export_data['Value'].append(opt['r_squared'])
-            export_data['Unit'].append('')
-            
-            # Add thermal results
-            export_data['Parameter'].append('Time Constant')
-            export_data['Value'].append(results['tau_seconds'])
-            export_data['Unit'].append('s')
-            
-            export_data['Parameter'].append('hS Value')
-            export_data['Value'].append(results['hS'])
-            export_data['Unit'].append('W/K')
-            
-            export_data['Parameter'].append('PCE')
-            export_data['Value'].append(results['efficiency'])
-            export_data['Unit'].append('%')
-            
             export_df = pd.DataFrame(export_data)
-            
             csv = export_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Results CSV",
-                data=csv,
-                file_name=f"pce_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            st.download_button("📥 Download Results", data=csv,
+                              file_name=f"pce_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                              mime="text/csv", use_container_width=True)
 
 # ============================================================================
 # TAB 7: AI Research Assistant Class
