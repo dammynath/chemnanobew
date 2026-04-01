@@ -6788,7 +6788,7 @@ def display_pce_tab():
                 # Display key metrics
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    st.metric("ΔT Total", f"{results['delta_T']:.2f}°C")
+                    st.metric("ΔT Total", f"{results['delta_T_sample']:.2f}°C")
                 with col2:
                     st.metric("ΔT Net", f"{results['delta_T_net']:.2f}°C")
                 with col3:
