@@ -5895,7 +5895,7 @@ def display_advanced_visualization(uploaded_file):
                         mime="text/csv"
                     )
 # ============================================================================
-# TAB 6: PCE Analyzer - COMPLETE WITH Q_dis AND FIXED ERROR HANDLING
+# TAB 6: PCE Analyzer - COMPLETE WITH Q_dis AND FIXED TYPE ERRORS
 # ============================================================================
 
 def find_optimal_linear_region_adaptive(time_values, ln_theta_values, min_points=5, r2_threshold=0.985):
@@ -6144,7 +6144,7 @@ def calculate_pce_with_qdis(df, peak_idx, params, solvent_data=None, solvent_pea
 
 
 def display_pce_tab():
-    """Photothermal Conversion Efficiency Analysis Tab with Q_dis"""
+    """Photothermal Conversion Efficiency Analysis Tab with Q_dis and Fixed Type Errors"""
     
     st.markdown("<h2 class='sub-header'>🔥 Photothermal Conversion Efficiency (PCE) Analyzer</h2>", unsafe_allow_html=True)
     
@@ -6252,7 +6252,12 @@ def display_pce_tab():
                 # Use estimated ΔT
                 st.session_state['solvent_data'] = None
                 st.session_state['solvent_delta_estimate'] = st.number_input(
-                    "Estimated Solvent ΔT (°C)", 0.0, 20.0, 3.5, step=0.5,
+                    "Estimated Solvent ΔT (°C)", 
+                    min_value=0.0, 
+                    max_value=20.0, 
+                    value=3.5, 
+                    step=0.5,
+                    format="%.1f",
                     help="Maximum temperature rise of pure solvent"
                 )
             
@@ -6263,7 +6268,7 @@ def display_pce_tab():
                 st.metric("Solvent Peak Temp", f"{solvent_df.loc[peak_idx, 'temperature_°C']:.1f}°C")
     
     # ========================================================================
-    # Tab 2: PCE Parameters
+    # Tab 2: PCE Parameters - FIXED TYPE ERRORS
     # ========================================================================
     with pce_tabs[1]:
         st.markdown("### ⚙️ Experimental Parameters")
@@ -6272,23 +6277,73 @@ def display_pce_tab():
         
         with col1:
             st.markdown("#### Sample Properties")
-            mass = st.number_input("Sample Mass (g)", 0.001, 100.0, 1.0, step=0.1, format="%.3f")
-            cp = st.number_input("Specific Heat (J/g·K)", 0.1, 10.0, 4.184, step=0.01)
+            mass = st.number_input(
+                "Sample Mass (g)", 
+                min_value=0.001, 
+                max_value=100.0, 
+                value=1.0, 
+                step=0.1, 
+                format="%.3f"
+            )
+            cp = st.number_input(
+                "Specific Heat (J/g·K)", 
+                min_value=0.1, 
+                max_value=10.0, 
+                value=4.184, 
+                step=0.01, 
+                format="%.3f"
+            )
             
             st.markdown("#### Laser Parameters")
-            laser_power = st.number_input("Laser Power (W)", 0.01, 10.0, 1.0, step=0.1)
-            absorbance = st.number_input("Absorbance at λ", 0.01, 5.0, 0.5, step=0.05)
-            ambient_temp = st.number_input("Ambient Temp (°C)", 15, 35, 25, step=0.5)
+            laser_power = st.number_input(
+                "Laser Power (W)", 
+                min_value=0.01, 
+                max_value=10.0, 
+                value=1.0, 
+                step=0.1, 
+                format="%.2f"
+            )
+            absorbance = st.number_input(
+                "Absorbance at λ", 
+                min_value=0.01, 
+                max_value=5.0, 
+                value=0.5, 
+                step=0.05, 
+                format="%.2f"
+            )
+            # FIXED: All values now have consistent type (float)
+            ambient_temp = st.number_input(
+                "Ambient Temp (°C)", 
+                min_value=15.0, 
+                max_value=35.0, 
+                value=25.0, 
+                step=0.5, 
+                format="%.1f"
+            )
         
         with col2:
             st.markdown("#### Additional Parameters")
-            spot_area = st.number_input("Spot Area (cm²)", 0.01, 10.0, 0.50265, step=0.1)
+            spot_area = st.number_input(
+                "Spot Area (cm²)", 
+                min_value=0.01, 
+                max_value=10.0, 
+                value=0.50265, 
+                step=0.1, 
+                format="%.4f"
+            )
             power_density = laser_power / spot_area if spot_area > 0 else 0
             st.metric("Power Density", f"{power_density:.2f} W/cm²")
             
             st.markdown("#### Solvent Correction")
             if st.session_state.get('solvent_data') is None:
-                solvent_delta = st.number_input("Solvent ΔT (°C)", 0.0, 20.0, 3.5, step=0.5)
+                solvent_delta = st.number_input(
+                    "Solvent ΔT (°C)", 
+                    min_value=0.0, 
+                    max_value=20.0, 
+                    value=3.5, 
+                    step=0.5, 
+                    format="%.1f"
+                )
             else:
                 solvent_delta = None
         
@@ -6458,8 +6513,11 @@ def display_pce_tab():
                         st.metric("Intercept", f"{opt_region['intercept']:.4f}")
                     with col3:
                         # FIXED: Handle slope = 0 case
-                        tau_val = 1 / opt_region['slope'] if opt_region['slope'] > 0 else float('inf')
-                        st.metric("Time Constant τ", f"{tau_val:.2f} mins" if tau_val != float('inf') else "N/A")
+                        if opt_region['slope'] > 0:
+                            tau_val = 1 / opt_region['slope']
+                            st.metric("Time Constant τ", f"{tau_val:.2f} mins")
+                        else:
+                            st.metric("Time Constant τ", "N/A (slope ≤ 0)")
                 else:
                     st.warning("Not enough data points in selected range.")
     
