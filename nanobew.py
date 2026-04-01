@@ -6738,9 +6738,9 @@ def display_pce_tab():
                     "Solvent Blank ΔT (°C)",
                     min_value=0.0,
                     max_value=50.0,
-                    value=3.5,
+                    value=14.07,
                     step=0.1,
-                    format="%.1f",
+                    format="%.2",
                     key="pce_solvent_manual",
                     help="Temperature rise of pure solvent (overrides loaded data)"
                 )
