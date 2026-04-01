@@ -6087,7 +6087,7 @@ def analyze_r2_progression(time_values, ln_theta_values, max_points=None):
     return point_counts, r2_values
 
 
-def calculate_pce_optimized(df, peak_idx, params, solvent_data=None, solvent_peak_idx=None):
+def calculate_pce_optimized_adaptive(df, peak_idx, params, solvent_data=None, solvent_peak_idx=None):
     """
     Calculate photothermal conversion efficiency with adaptive linear region selection.
     Includes Q_dis correction for solvent.
@@ -6783,7 +6783,7 @@ def display_pce_tab():
                 st.markdown("### 📈 Photothermal Analysis with Adaptive R²")
                 
                 # Calculate PCE using optimized adaptive method
-                results = calculate_pce_optimized_adaptive(df, peak_idx, params)
+                results = calculate_pce_optimized_adaptive(df, peak_idx, params, solvent_data=None, solvent_peak_idx=None)
                 
                 # Display key metrics
                 col1, col2, col3, col4 = st.columns(4)
