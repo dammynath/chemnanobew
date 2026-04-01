@@ -6625,8 +6625,8 @@ def display_pce_tab():
                     st.session_state['solvent_delta_estimate'] = st.number_input(
                         "Estimated Solvent ΔT (°C)", 
                         min_value=0.0, 
-                        max_value=20.0, 
-                        value=3.5, 
+                        max_value=50.0, 
+                        value=14.1, 
                         step=0.5,
                         format="%.1f",
                         help="Maximum temperature rise of pure solvent"
