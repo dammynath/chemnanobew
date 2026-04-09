@@ -2156,7 +2156,7 @@ def display_quantum_dots_tab(uploaded_file):
             
             target_absorption = st.number_input("Target Absorption (nm)", 700, 1000, 800, key="cite_target_abs")
             target_plqy = st.number_input("Target PLQY (%)", 30, 90, 60, key="cite_target_plqy")
-            target_intensity = st.number_input("Target Intensity (a.u.)", 1000, 10000, 5000, key="cite_target_int")
+            target_intensity = st.number_input("Target Intensity (a.u.)", 100, 100000, 5000, key="cite_target_int")
             
             st.markdown("#### Current Best Values")
             # Get numeric columns only
