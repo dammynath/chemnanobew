@@ -2401,7 +2401,7 @@ def display_quantum_dots_tab(uploaded_file):
                     best_params = cite_df.loc[best_idx, available_params].to_dict()
                     
                     suggestion = {}
-                    ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, pH]
+                    ranges_list = [cu_in_ratio, te_content, temperature, time_val, zn_precursor, pH_val]
                     for i, param in enumerate(available_params):
                         low, high = ranges_list[i]
                         # Add exploration noise
