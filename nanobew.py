@@ -2258,7 +2258,7 @@ def display_quantum_dots_tab(uploaded_file):
                             # Define search space using the range tuples
                             space = [
                                 #Real(cu_in_ratio[0], cu_in_ratio[1], name='cu_in_ratio'),
-                                Real(cucl2_mg[0], cucl2_mg[1], name='cucl2_mg'),
+                                Real(cucl2[0], cucl2[1], name='cucl2'),
                                 Real(te_salt[0], te_salt[1], name='te_salt'),
                                 Real(temperature[0], temperature[1], name='temperature'),
                                 Real(time_val[0], time_val[1], name='time'),
