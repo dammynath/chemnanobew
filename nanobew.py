@@ -2189,7 +2189,7 @@ def display_quantum_dots_tab(uploaded_file):
         else:
             with st.spinner("Generating synthetic CIS-Te/ZnS data..."):
                 cite_df = generate_cis_te_data(n_samples=40)
-                cite_df["intensity"] = 15000 + 5000 * (cite_df["te_content"] - 5) / 5 + 2000 * (cite_df["pH"] - 6)
+                #cite_df["intensity"] = 15000 + 5000 * (cite_df["te_content"] - 5) / 5 + 2000 * (cite_df["pH"] - 6)
             st.info("📊 Using synthetic CIS-Te/ZnS data. Upload your own CSV for real optimization.")
         
         st.dataframe(cite_df.head(10), use_container_width=True)
