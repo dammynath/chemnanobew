@@ -2185,7 +2185,7 @@ def display_quantum_dots_tab(uploaded_file):
                     if col in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
                     'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_precursor_mg', 'thiourea_mg',
                     'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
-                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH', 
+                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH', 
                               'absorption_nm', 'intensity', 'plqy_percent']:
                         cite_df[col] = pd.to_numeric(cite_df[col], errors='coerce')
                 cite_df = cite_df.dropna()
@@ -2214,7 +2214,7 @@ def display_quantum_dots_tab(uploaded_file):
                     feature_cols = ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
                     'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_precursor_mg', 'thiourea_mg',
                     'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
-                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH', 
+                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH', 
                               'absorption_nm', 'intensity', 'plqy_percent']
                     # Check if all feature columns exist
                     available_features = [f for f in feature_cols if f in cite_df.columns]
@@ -2257,7 +2257,8 @@ def display_quantum_dots_tab(uploaded_file):
                             
                             # Define search space using the range tuples
                             space = [
-                                Real(cu_in_ratio[0], cu_in_ratio[1], name='cu_in_ratio'),
+                                #Real(cu_in_ratio[0], cu_in_ratio[1], name='cu_in_ratio'),
+                                Real(cucl2_mg[0], cucl2_mg[1], name='cucl2_mg'),
                                 Real(te_salt[0], te_salt[1], name='te_salt'),
                                 Real(temperature[0], temperature[1], name='temperature'),
                                 Real(time_val[0], time_val[1], name='time'),
@@ -2282,7 +2283,7 @@ def display_quantum_dots_tab(uploaded_file):
                             )
                             
                             best_params = {
-                                'cu_in_ratio': result.x[0],
+                                'cucl2_mg': result.x[0],
                                 'te_salt': result.x[1],
                                 'temperature': result.x[2],
                                 'time': result.x[3],
@@ -2309,8 +2310,8 @@ def display_quantum_dots_tab(uploaded_file):
                             st.warning("scikit-optimize not installed. Using random search...")
                             # Fallback to random search
                             best_params = {}
-                            param_names = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
-                            ranges = [cu_in_ratio, te_salt, temperature, time_val, zn_precursor, pH]
+                            param_names = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                            ranges = [cucl2_mg, te_salt, temperature, time_val, zn_precursor, pH]
                             
                             for param, (low, high) in zip(param_names, ranges):
                                 best_params[param] = np.random.uniform(low, high)
@@ -2326,7 +2327,7 @@ def display_quantum_dots_tab(uploaded_file):
                 from sklearn.ensemble import RandomForestRegressor
                 
                 # Prepare features
-                feature_cols = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                feature_cols = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
                 available_features = [f for f in feature_cols if f in cite_df.columns]
                 
                 if len(available_features) >= 2 and 'absorption_nm' in cite_df.columns and 'intensity' in cite_df.columns:
@@ -2342,7 +2343,7 @@ def display_quantum_dots_tab(uploaded_file):
                     # Generate grid of points
                     n_grid = 10  # Reduced for performance
                     grid_points = []
-                    ranges_list = [cu_in_ratio, te_salt, temperature, time_val, zn_precursor, pH]
+                    ranges_list = [cucl2_mg, te_salt, temperature, time_val, zn_precursor, pH]
                     for i, param in enumerate(available_features):
                         low, high = ranges_list[i]
                         grid_points.append(np.linspace(low, high, n_grid))
@@ -2407,13 +2408,13 @@ def display_quantum_dots_tab(uploaded_file):
                 if 'absorption_nm' in cite_df.columns:
                     # Simple RL-inspired suggestion
                     best_idx = cite_df['absorption_nm'].idxmax()
-                    param_cols = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                    param_cols = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
                     available_params = [p for p in param_cols if p in cite_df.columns]
                     
                     best_params = cite_df.loc[best_idx, available_params].to_dict()
                     
                     suggestion = {}
-                    ranges_list = [cu_in_ratio, te_salt, temperature, time_val, zn_precursor, pH_val]
+                    ranges_list = [cucl2_mg, te_salt, temperature, time_val, zn_precursor, pH_val]
                     for i, param in enumerate(available_params):
                         low, high = ranges_list[i]
                         # Add exploration noise
@@ -2441,7 +2442,7 @@ def display_quantum_dots_tab(uploaded_file):
             # Dynamic input fields based on QD type
             inputs = {}
             if qd_type == "CIS-Te/ZnS":
-                params = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                params = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
             else:
                 params = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
             
@@ -2476,7 +2477,7 @@ def display_quantum_dots_tab(uploaded_file):
                 with st.spinner("Training prediction models..."):
                     # Prepare features and targets
                     if qd_type == "CIS-Te/ZnS":
-                        feature_cols = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                        feature_cols = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
                     else:
                         feature_cols = [p for p in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
                                       if p in data.columns and pd.api.types.is_numeric_dtype(data[p])]
@@ -2575,7 +2576,7 @@ def display_quantum_dots_tab(uploaded_file):
             # Get factor ranges from data - only numeric columns
             factors = {}
             if qd_type == "CIS-Te/ZnS":
-                param_list = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                param_list = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
             else:
                 param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
             
@@ -2712,7 +2713,7 @@ def display_quantum_dots_tab(uploaded_file):
                 # Define factor ranges from numeric columns only
                 factor_ranges = {}
                 if qd_type == "CIS-Te/ZnS":
-                    param_list = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                    param_list = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
                 else:
                     param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
@@ -2890,7 +2891,7 @@ def display_quantum_dots_tab(uploaded_file):
             
             # Get available numeric features
             if qd_type == "CIS-Te/ZnS":
-                default_features = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                default_features = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
             else:
                 default_features = [c for c in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
                                   if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:4]
@@ -3203,7 +3204,7 @@ def display_quantum_dots_tab(uploaded_file):
                 ## Key Parameters
                 """
                 if qd_type == "CIS-Te/ZnS":
-                    param_list = ['cu_in_ratio', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                    param_list = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
                 else:
                     param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
@@ -3284,7 +3285,7 @@ def generate_cis_te_data(n_samples=50):
     
     
     # Generate optical properties with Te-dependent red shift
-    base_abs = 700 + 100 * (data['te_salt'] - 5) / 5 + 50 * (data['cu_in_ratio'] - 1)
+    base_abs = 700 + 100 * (data['te_salt'] - 5) / 5 + 50 * (data['cucl2_mg'] - 1)
     data['absorption_nm'] = (base_abs + np.random.normal(0, 20, n_samples)).astype(float)
     
     data['plqy_percent'] = (50 + 15 * np.sin(data['te_salt'] / 5) + np.random.normal(0, 8, n_samples)).astype(float)
