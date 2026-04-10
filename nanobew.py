@@ -3288,7 +3288,7 @@ def generate_cis_te_data(n_samples=50):
 # ============================================================================
 # TAB 2: Porphyrins
 # ============================================================================
-def display_porpHyrins_tab(uploaded_file):
+def display_porphyrins_tab(uploaded_file):
     """PorpHyrins tab content with DoE and RL tools"""
     st.markdown("<h2 class='sub-header'>PorpHyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
     
