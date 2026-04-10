@@ -2179,7 +2179,7 @@ def display_quantum_dots_tab(uploaded_file):
                 for col in cite_df.columns:
                     if col in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
                     'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_ac_mg', 'thiourea_mg',
-                    'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'ph',
+                    'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
                     'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH', 
                               'absorption_nm', 'intensity', 'plqy_percent']:
                         cite_df[col] = pd.to_numeric(cite_df[col], errors='coerce')
@@ -2206,7 +2206,11 @@ def display_quantum_dots_tab(uploaded_file):
                     from sklearn.ensemble import RandomForestRegressor
                     
                     # Prepare features - ensure numeric
-                    feature_cols = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
+                    feature_cols = ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
+                    'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_ac_mg', 'thiourea_mg',
+                    'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
+                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH', 
+                              'absorption_nm', 'intensity', 'plqy_percent']
                     # Check if all feature columns exist
                     available_features = [f for f in feature_cols if f in cite_df.columns]
                     
@@ -2216,9 +2220,9 @@ def display_quantum_dots_tab(uploaded_file):
                         X = cite_df[available_features].values
                         
                         # Check if target columns exist
-                        if 'absorption_nm' in cite_df.columns and 'intensity' in cite_df.columns:
-                            y_abs = cite_df['absorption_nm'].values
-                            y_int = cite_df['intensity'].values
+                        if 'emission_nm' in cite_df.columns and 'pl_intensity' in cite_df.columns:
+                            y_abs = cite_df['emission_nm'].values
+                            y_int = cite_df['pl_intensity'].values
                             
                             # Train models
                             model_abs = RandomForestRegressor(n_estimators=100, random_state=42)
@@ -2703,7 +2707,7 @@ def display_quantum_dots_tab(uploaded_file):
                 # Define factor ranges from numeric columns only
                 factor_ranges = {}
                 if qd_type == "CIS-Te/ZnS":
-                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                    param_list = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
                 else:
                     param_list = qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params']
                 
@@ -3232,7 +3236,7 @@ def generate_cis_te_data(n_samples=50):
         'core_time_min': 30.0,
         'te_incorp_time_min': 10.0,
         'shell_time_min': 20.0,
-        'ph': 3.0,
+        'pH': 3.0,
         'excitation_nm': 550.0,
         'emission_nm': 815.0,
         'pl_intensity': 12828.54,  # CORRECTED VALUE
@@ -3260,7 +3264,7 @@ def generate_cis_te_data(n_samples=50):
         noise = np.random.normal(0, base_val * variation, n_samples)
         data[param] = base_val + noise
         
-        if param == 'ph':
+        if param == 'pH':
             data[param] = np.clip(data[param], 2.5, 3.5)
         elif param == 'core_temp_c':
             data[param] = np.clip(data[param], 88, 102)
