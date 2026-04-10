@@ -2132,7 +2132,6 @@ def display_quantum_dots_tab(uploaded_file):
             citrate = st.slider("Trisodium Citrate (mg)", 250.0, 350.0, 294.0, 5.0, key="cite_citrate")
             temperature = st.slider("Temperature (°C)", 90, 280, (90, 200), key="cite_temp")
             time_val = st.slider("Reaction Time (min)", 10, 240, (30, 120), key="cite_time")
-            zn_precursor = st.slider("Zn Precursor (M)", 0.1, 1.0, (0.2, 0.6), key="cite_zn")
             pH_val = st.slider("pH", 2.0, 10.0, (3.0, 7.5), key="cite_pH")
             tga = st.slider("Thioglycolic Acid (µl)", 50.0, 90.0, 70.0, 2.0, key="cite_tga")
             na2s = st.slider("Na₂S (mg)", 80.0, 120.0, 97.5, 2.0, key="cite_na2s")
