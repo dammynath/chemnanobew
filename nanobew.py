@@ -3228,7 +3228,7 @@ def generate_cis_te_data(n_samples=50):
             'core_time_min': 30.0,
             'te_incorp_time_min': 10.0,
             'shell_time_min': 20.0,
-            'pH': 3.0,
+            'ph': 3.0,
             'excitation_nm': 550.0,
             'emission_nm': 815.0,
             'pl_intensity': 12828.54,  # CORRECTED: 12,828.54 a.u.
@@ -3241,34 +3241,34 @@ def generate_cis_te_data(n_samples=50):
         }
         
     data = {}
-        for param, base_val in experimental_values.items():
-            # Add realistic variation (±5-15% depending on parameter)
-            if param in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'na2s_mg']:
-                variation = 0.05  # 5% variation for weighed chemicals
-            elif param in ['tga_ul', 'nabh4_mg', 'te_salt_mg', 'zn_ac_mg', 'thiourea_mg']:
-                variation = 0.10  # 10% for smaller quantities
-            elif param in ['core_temp_c', 'shell_time_min']:
-                variation = 0.03  # 3% for controlled conditions
-            elif param in ['pl_intensity', 'emission_nm']:
-                variation = 0.02  # 2% for optical measurements
-            else:
-                variation = 0.08  # 8% for other parameters
-            
-            noise = np.random.normal(0, base_val * variation, n_samples)
-            data[param] = base_val + noise
-            # Clip to reasonable ranges
-            if param == 'pH':
-                data[param] = np.clip(data[param], 2.5, 3.5)
-            elif param == 'core_temp_c':
-                data[param] = np.clip(data[param], 88, 102)
-            elif param == 'pl_intensity':
-                data[param] = np.clip(data[param], base_val * 0.8, base_val * 1.2)
-            elif param == 'emission_nm':
-                data[param] = np.clip(data[param], 800, 830)
-            elif 'mg' in param and base_val > 0:
-                data[param] = np.clip(data[param], base_val * 0.7, base_val * 1.3)
+    for param, base_val in experimental_values.items():
+        # Add realistic variation (±5-15% depending on parameter)
+        if param in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'na2s_mg']:
+            variation = 0.05  # 5% variation for weighed chemicals
+        elif param in ['tga_ul', 'nabh4_mg', 'te_salt_mg', 'zn_ac_mg', 'thiourea_mg']:
+            variation = 0.10  # 10% for smaller quantities
+        elif param in ['core_temp_c', 'shell_time_min']:
+            variation = 0.03  # 3% for controlled conditions
+        elif param in ['pl_intensity', 'emission_nm']:
+            variation = 0.02  # 2% for optical measurements
+        else:
+            variation = 0.08  # 8% for other parameters
         
-        return pd.DataFrame(data)
+        noise = np.random.normal(0, base_val * variation, n_samples)
+        data[param] = base_val + noise
+        # Clip to reasonable ranges
+        if param == 'ph':
+            data[param] = np.clip(data[param], 2.5, 3.5)
+        elif param == 'core_temp_c':
+            data[param] = np.clip(data[param], 88, 102)
+        elif param == 'pl_intensity':
+            data[param] = np.clip(data[param], base_val * 0.8, base_val * 1.2)
+        elif param == 'emission_nm':
+            data[param] = np.clip(data[param], 800, 830)
+        elif 'mg' in param and base_val > 0:
+            data[param] = np.clip(data[param], base_val * 0.7, base_val * 1.3)
+    
+    return pd.DataFrame(data)
     
     
     # Generate optical properties with Te-dependent red shift
