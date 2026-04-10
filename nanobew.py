@@ -3240,7 +3240,7 @@ def generate_cis_te_data(n_samples=50):
             'core_lifetime_ns': 23.64
         }
         
-        data = {}
+    data = {}
         for param, base_val in experimental_values.items():
             # Add realistic variation (±5-15% depending on parameter)
             if param in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'na2s_mg']:
