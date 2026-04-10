@@ -2127,13 +2127,13 @@ def display_quantum_dots_tab(uploaded_file):
             st.markdown("#### Parameter Ranges")
             
             # CIS-Te/ZnS specific parameters with proper tuple handling
-            cu_in_ratio = st.slider("Cu:In Ratio", 0.3, 2.0, (0.8, 1.2), key="cite_cu_in")
+            cu_in_ratio = st.slider("Cu:In Ratio", 0.1, 2.0, (0.8, 1.2), key="cite_cu_in")
             te_content = st.slider("Te Content (mol%)", 0.0, 15.0, (3.0, 8.0), key="cite_te", 
                                   help="Tellurium doping percentage")
-            temperature = st.slider("Temperature (°C)", 150, 280, (180, 240), key="cite_temp")
-            time_val = st.slider("Reaction Time (min)", 30, 240, (60, 150), key="cite_time")
+            temperature = st.slider("Temperature (°C)", 90, 280, (90, 200), key="cite_temp")
+            time_val = st.slider("Reaction Time (min)", 10, 240, (30, 120), key="cite_time")
             zn_precursor = st.slider("Zn Precursor (M)", 0.1, 1.0, (0.2, 0.6), key="cite_zn")
-            pH_val = st.slider("pH", 4.0, 10.0, (5.5, 7.5), key="cite_pH")
+            pH_val = st.slider("pH", 2.0, 10.0, (3.0, 7.5), key="cite_pH")
             
             ranges = {
                 "cu_in_ratio": cu_in_ratio,
@@ -2878,7 +2878,7 @@ def display_quantum_dots_tab(uploaded_file):
             
             # Get available numeric features
             if qd_type == "CIS-Te/ZnS":
-                default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'ph']
+                default_features = ['cu_in_ratio', 'te_content', 'temperature', 'time', 'zn_precursor', 'pH']
             else:
                 default_features = [c for c in qd_manager.qd_types.get(qd_type, {'key_params': []})['key_params'] 
                                   if c in data.columns and pd.api.types.is_numeric_dtype(data[c])][:4]
@@ -3213,16 +3213,63 @@ def display_quantum_dots_tab(uploaded_file):
 def generate_cis_te_data(n_samples=50):
     """Generate sample data for CIS-Te/ZnS quantum dots"""
     np.random.seed(42)
+
+    experimental_values = {
+            'cucl2_mg': 11.0,
+            'incl3_mg': 55.0,
+            'trisodium_citrate_mg': 294.0,
+            'tga_ul': 70.0,
+            'na2s_mg': 97.5,
+            'nabh4_mg': 26.0,
+            'te_salt_mg': 1.7,
+            'zn_ac_mg': 30.0,
+            'thiourea_mg': 15.0,
+            'core_temp_c': 95.0,
+            'core_time_min': 30.0,
+            'te_incorp_time_min': 10.0,
+            'shell_time_min': 20.0,
+            'pH': 3.0,
+            'excitation_nm': 550.0,
+            'emission_nm': 815.0,
+            'pl_intensity': 12828.54,  # CORRECTED: 12,828.54 a.u.
+            'lifetime_ns': 37.54,
+            'quantum_yield_percent': 5.13,
+            'core_emission_nm': 827.0,
+            'core_pl_intensity': 2901.0,
+            'core_qy_percent': 0.82,
+            'core_lifetime_ns': 23.64
+        }
+        
+        data = {}
+        for param, base_val in experimental_values.items():
+            # Add realistic variation (±5-15% depending on parameter)
+            if param in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'na2s_mg']:
+                variation = 0.05  # 5% variation for weighed chemicals
+            elif param in ['tga_ul', 'nabh4_mg', 'te_salt_mg', 'zn_ac_mg', 'thiourea_mg']:
+                variation = 0.10  # 10% for smaller quantities
+            elif param in ['core_temp_c', 'shell_time_min']:
+                variation = 0.03  # 3% for controlled conditions
+            elif param in ['pl_intensity', 'emission_nm']:
+                variation = 0.02  # 2% for optical measurements
+            else:
+                variation = 0.08  # 8% for other parameters
+            
+            noise = np.random.normal(0, base_val * variation, n_samples)
+            data[param] = base_val + noise
+            # Clip to reasonable ranges
+            if param == 'pH':
+                data[param] = np.clip(data[param], 2.5, 3.5)
+            elif param == 'core_temp_c':
+                data[param] = np.clip(data[param], 88, 102)
+            elif param == 'pl_intensity':
+                data[param] = np.clip(data[param], base_val * 0.8, base_val * 1.2)
+            elif param == 'emission_nm':
+                data[param] = np.clip(data[param], 800, 830)
+            elif 'mg' in param and base_val > 0:
+                data[param] = np.clip(data[param], base_val * 0.7, base_val * 1.3)
+        
+        return pd.DataFrame(data)
     
-    data = {
-        'cu_in_ratio': np.random.uniform(0.5, 1.8, n_samples).astype(float),
-        'te_content': np.random.uniform(1.0, 12.0, n_samples).astype(float),
-        'temperature': np.random.uniform(160, 260, n_samples).astype(float),
-        'time': np.random.uniform(45, 210, n_samples).astype(float),
-        'zn_precursor': np.random.uniform(0.15, 0.8, n_samples).astype(float),
-        'pH': np.random.uniform(5.0, 8.5, n_samples).astype(float),
-        'surfactant': np.random.choice(['oleic_acid', 'oleylamine', 'dodecanethiol', 'TOP'], n_samples),
-    }
     
     # Generate optical properties with Te-dependent red shift
     base_abs = 700 + 100 * (data['te_content'] - 5) / 5 + 50 * (data['cu_in_ratio'] - 1)
@@ -3241,13 +3288,13 @@ def generate_cis_te_data(n_samples=50):
 # ============================================================================
 # TAB 2: Porphyrins
 # ============================================================================
-def display_porphyrins_tab(uploaded_file):
-    """Porphyrins tab content with DoE and RL tools"""
-    st.markdown("<h2 class='sub-header'>Porphyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
+def display_porpHyrins_tab(uploaded_file):
+    """PorpHyrins tab content with DoE and RL tools"""
+    st.markdown("<h2 class='sub-header'>PorpHyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class='info-box'>
-    Optimize porphyrin synthesis for maximum yield, purity, and singlet oxygen generation using 
+    Optimize porpHyrin synthesis for maximum yield, purity, and singlet oxygen generation using 
     Design of Experiments (DoE), Bayesian Optimization, and Reinforcement Learning.
     </div>
     """, unsafe_allow_html=True)
@@ -3257,10 +3304,10 @@ def display_porphyrins_tab(uploaded_file):
         data = DataManager.load_data(uploaded_file)
         if data is None:
             st.warning("⚠️ Could not load uploaded file. Using sample data instead.")
-            data = DataManager.create_sample_porphyrin_data(50)
+            data = DataManager.create_sample_porpHyrin_data(50)
     else:
-        data = DataManager.create_sample_porphyrin_data(50)
-        st.info("📊 Using sample porphyrin data. Upload your own CSV for real optimization.")
+        data = DataManager.create_sample_porpHyrin_data(50)
+        st.info("📊 Using sample porpHyrin data. Upload your own CSV for real optimization.")
     
     if data is None:
         st.error("Failed to load data")
@@ -3278,7 +3325,7 @@ def display_porphyrins_tab(uploaded_file):
     
     with por_tabs[0]:
         if len(data) > 0:
-            st.markdown("### Porphyrin Synthesis Data")
+            st.markdown("### PorpHyrin Synthesis Data")
             st.dataframe(data.head(10), use_container_width=True)
             
             col1, col2, col3, col4 = st.columns(4)
@@ -3376,7 +3423,7 @@ def display_porphyrins_tab(uploaded_file):
         st.markdown("### 🔮 Molecular Property Prediction")
         
         smiles = st.text_input(
-            "Enter Porphyrin SMILES string",
+            "Enter PorpHyrin SMILES string",
             value="C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2",
             key="por_smiles"
         )
@@ -3443,7 +3490,7 @@ def display_porphyrins_tab(uploaded_file):
                 st.metric("Estimated Quantum Yield", f"{qy:.3f}")
     
     with por_tabs[3]:
-        st.markdown("### 📐 Design of Experiments for Porphyrin Synthesis")
+        st.markdown("### 📐 Design of Experiments for PorpHyrin Synthesis")
         
         col1, col2 = st.columns(2)
         
@@ -3519,7 +3566,7 @@ def display_porphyrins_tab(uploaded_file):
             st.download_button(
                 label="📥 Download Design as CSV",
                 data=csv,
-                file_name=f"porphyrin_doe_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                file_name=f"porpHyrin_doe_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
     
@@ -3802,7 +3849,7 @@ def display_molecular_generator_tab():
                 
                 prior_model = st.selectbox(
                     "Prior Model",
-                    ["priors/reinvent.prior", "priors/porphyrin_prior.prior", "priors/chembl.prior"],
+                    ["priors/reinvent.prior", "priors/porpHyrin_prior.prior", "priors/chembl.prior"],
                     key="reinvent_prior"
                 )
                 reinvent.prior_model = prior_model
@@ -3812,7 +3859,7 @@ def display_molecular_generator_tab():
         if st.button("🚀 Generate Novel Molecules", use_container_width=True, type="primary"):
             with st.spinner("Generating molecules..."):
                 if reinvent.available:
-                    config = reinvent.create_porphyrin_config(
+                    config = reinvent.create_porpHyrin_config(
                         target_absorbance=target_abs,
                         target_fluorescence=target_fluor,
                         target_qy=target_qy,
@@ -3848,7 +3895,7 @@ def display_molecular_generator_tab():
         with col1:
             base_scaffold = st.text_input(
                 "Base Scaffold SMILES",
-                value=reinvent.get_default_porphyrin_scaffold(),
+                value=reinvent.get_default_porpHyrin_scaffold(),
                 key="scaffold_smiles"
             )
             
@@ -3869,7 +3916,7 @@ def display_molecular_generator_tab():
         if st.button("🎯 Generate Scaffold Variants", use_container_width=True):
             with st.spinner("Generating scaffold variants..."):
                 if reinvent.available:
-                    config = reinvent.create_porphyrin_config(
+                    config = reinvent.create_porpHyrin_config(
                         target_absorbance=target_abs_scaffold,
                         target_fluorescence=target_fluor_scaffold,
                         num_molecules=num_variants,
@@ -3902,7 +3949,7 @@ def display_molecular_generator_tab():
         with col1:
             core_smiles = st.text_input(
                 "Core SMILES with R-group markers",
-                value=reinvent.get_default_porphyrin_scaffold(),
+                value=reinvent.get_default_porpHyrin_scaffold(),
                 key="core_smiles",
                 help="Use '*' to mark R-group positions"
             )
