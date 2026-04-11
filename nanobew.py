@@ -2090,23 +2090,40 @@ def display_quantum_dots_tab(uploaded_file):
             for target in available_targets[:4]:  # Limit to 4 metrics
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    try:
+                    if target == 'emission_nm':
+                        max_val = data[target].min()
+                        st.metric(f"Best {target}", f"{max_val:.1f}")
+                    elif target == 'plqy_percent':
+                        # FIXED: Normalize PLQY to 0-100% range
+                        plqy_values = data[target].clip(0, 100)
+                        max_val = plqy_values.max()
+                        st.metric(f"Best {target}", f"{max_val:.1f}%")
+                    elif:
                         max_val = data[target].max()
-                        if pd.api.types.is_numeric_dtype(data[target]):
-                            st.metric(f"Best {target}", f"{max_val:.2f}")
-                        else:
-                            st.metric(f"Best {target}", str(max_val))
-                    except:
-                        st.metric(f"Best {target}", "N/A")
+                        st.metric(f"Best {target}", f"{max_val:.2f}")
+                    #try:
+                     #   max_val = data[target].max()
+                      #  if pd.api.types.is_numeric_dtype(data[target]):
+                       #     st.metric(f"Best {target}", f"{max_val:.2f}")
+                    else:
+                        st.metric(f"Best {target}", str(max_val))
+                except:
+                    st.metric(f"Best {target}", "N/A")
                 with col_b:
-                    try:
-                        mean_val = data[target].mean()
-                        if pd.api.types.is_numeric_dtype(data[target]):
-                            st.metric(f"Mean {target}", f"{mean_val:.2f}")
-                        else:
-                            st.metric(f"Mean {target}", str(mean_val))
-                    except:
-                        st.metric(f"Mean {target}", "N/A")
+                    if target == 'plqy_percent':
+                        plqy_values = data[target].clip(0, 100)
+                        mean_val = plqy_values.mean()
+                        st.metric(f"Mean {target}", f"{mean_val:.1f}%")
+                    else:
+                        st.metric(f"Mean {target}", f"{data[target].mean():.2f}")
+                    #try:
+                     #   mean_val = data[target].mean()
+                      #  if pd.api.types.is_numeric_dtype(data[target]):
+                       #     st.metric(f"Mean {target}", f"{mean_val:.2f}")
+                        #else:
+                         #   st.metric(f"Mean {target}", str(mean_val))
+                except:
+                    st.metric(f"Mean {target}", "N/A")
     
     # ========================================================================
     # Tab 2: CIS-Te/ZnS Optimizer
@@ -2169,11 +2186,12 @@ def display_quantum_dots_tab(uploaded_file):
             
             if 'absorption_nm' in numeric_cols:
                 st.metric("Best Absorption", f"{data['absorption_nm'].max():.1f} nm")
-            if 'plqy_percent' in numeric_cols:
-                plqy_values = data['plqy_percent'].clip(0, 100)
-                st.metric("Best PLQY", f"{plqy_values.max():.1f}%")
-            if 'intensity' in numeric_cols:
-                st.metric("Best Intensity", f"{data['intensity'].max():.0f}")
+            if 'quantum_yield_percent' in numeric_cols:
+                plqy_values = data['quantum_yield_percent'].clip(0, 100)
+                current_plqy = plqy_values.max()
+                st.metric("Best PLQY", f"{current_plqy:.1f}%")
+            if 'pl_intensity' in numeric_cols:
+                st.metric("Best Intensity", f"{data['pl_intensity'].max():.0f}")
         
         # Upload specific CIS-Te/ZnS data
         cite_uploaded = st.file_uploader("Upload CIS-Te/ZnS experimental CSV", type="csv", key="cite_upload")
