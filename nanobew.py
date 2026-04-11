@@ -2058,70 +2058,70 @@ def display_quantum_dots_tab(uploaded_file):
     # Tab 1: Data Explorer
     # ========================================================================
     with qd_tabs[0]:
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.markdown("### Experimental Data")
-        st.dataframe(data.head(10), use_container_width=True)
+        col1, col2 = st.columns([2, 1])
         
-        with st.expander("📊 Summary Statistics"):
-            st.dataframe(data.describe(), use_container_width=True)
-    
-    with col2:
-        st.markdown("### Data Overview")
-        st.metric("Total Experiments", len(data))
-        st.metric("Features", len(data.columns))
-        
-        # Property targets - only show numeric columns
-        st.markdown("### 🎯 Target Properties")
-        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-        
-        # Define potential target properties
-        potential_targets = ['absorption_nm', 'plqy_percent', 'fwhm_nm', 'quantum_yield', 'size_nm', 'intensity', 
-                           'pce_percent', 'soq_au', 'fluorescence_qy', 'yield_percent', 'purity_percent']
-        
-        # Filter to only numeric columns that exist in data
-        available_targets = [t for t in potential_targets if t in numeric_cols]
-        
-        # If no predefined targets found, show first 4 numeric columns
-        if not available_targets and len(numeric_cols) > 0:
-            available_targets = numeric_cols[:4]
-        
-        for target in available_targets[:4]:  # Limit to 4 metrics
-            col_a, col_b = st.columns(2)
-            with col_a:
-                try:
-                    if target == 'emission_nm':
-                        max_val = data[target].min()
-                        st.metric(f"Best {target}", f"{max_val:.1f}")
-                    elif target == 'plqy_percent':
-                        # Normalize PLQY to 0-100% range
-                        plqy_values = data[target].clip(0, 100)
-                        max_val = plqy_values.max()
-                        st.metric(f"Best {target}", f"{max_val:.1f}%")
-                    else:
-                        max_val = data[target].max()
-                        if pd.api.types.is_numeric_dtype(data[target]):
-                            st.metric(f"Best {target}", f"{max_val:.2f}")
-                        else:
-                            st.metric(f"Best {target}", str(max_val))
-                except Exception as e:
-                    st.metric(f"Best {target}", "N/A")
+        with col1:
+            st.markdown("### Experimental Data")
+            st.dataframe(data.head(10), use_container_width=True)
             
-            with col_b:
-                try:
-                    if target == 'plqy_percent':
-                        plqy_values = data[target].clip(0, 100)
-                        mean_val = plqy_values.mean()
-                        st.metric(f"Mean {target}", f"{mean_val:.1f}%")
-                    else:
-                        mean_val = data[target].mean()
-                        if pd.api.types.is_numeric_dtype(data[target]):
-                            st.metric(f"Mean {target}", f"{mean_val:.2f}")
+            with st.expander("📊 Summary Statistics"):
+                st.dataframe(data.describe(), use_container_width=True)
+        
+        with col2:
+            st.markdown("### Data Overview")
+            st.metric("Total Experiments", len(data))
+            st.metric("Features", len(data.columns))
+            
+            # Property targets - only show numeric columns
+            st.markdown("### 🎯 Target Properties")
+            numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+            
+            # Define potential target properties
+            potential_targets = ['absorption_nm', 'plqy_percent', 'fwhm_nm', 'quantum_yield', 'size_nm', 'intensity', 
+                               'pce_percent', 'soq_au', 'fluorescence_qy', 'yield_percent', 'purity_percent']
+            
+            # Filter to only numeric columns that exist in data
+            available_targets = [t for t in potential_targets if t in numeric_cols]
+            
+            # If no predefined targets found, show first 4 numeric columns
+            if not available_targets and len(numeric_cols) > 0:
+                available_targets = numeric_cols[:4]
+            
+            for target in available_targets[:4]:  # Limit to 4 metrics
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    try:
+                        if target == 'emission_nm':
+                            max_val = data[target].min()
+                            st.metric(f"Best {target}", f"{max_val:.1f}")
+                        elif target == 'plqy_percent':
+                            # Normalize PLQY to 0-100% range
+                            plqy_values = data[target].clip(0, 100)
+                            max_val = plqy_values.max()
+                            st.metric(f"Best {target}", f"{max_val:.1f}%")
                         else:
-                            st.metric(f"Mean {target}", str(mean_val))
-                except Exception as e:
-                    st.metric(f"Mean {target}", "N/A")
+                            max_val = data[target].max()
+                            if pd.api.types.is_numeric_dtype(data[target]):
+                                st.metric(f"Best {target}", f"{max_val:.2f}")
+                            else:
+                                st.metric(f"Best {target}", str(max_val))
+                    except Exception as e:
+                        st.metric(f"Best {target}", "N/A")
+                
+                with col_b:
+                    try:
+                        if target == 'plqy_percent':
+                            plqy_values = data[target].clip(0, 100)
+                            mean_val = plqy_values.mean()
+                            st.metric(f"Mean {target}", f"{mean_val:.1f}%")
+                        else:
+                            mean_val = data[target].mean()
+                            if pd.api.types.is_numeric_dtype(data[target]):
+                                st.metric(f"Mean {target}", f"{mean_val:.2f}")
+                            else:
+                                st.metric(f"Mean {target}", str(mean_val))
+                    except Exception as e:
+                        st.metric(f"Mean {target}", "N/A")
     
     # ========================================================================
     # Tab 2: CIS-Te/ZnS Optimizer
