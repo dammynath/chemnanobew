@@ -2098,8 +2098,7 @@ def display_quantum_dots_tab(uploaded_file):
                         plqy_values = data[target].clip(0, 100)
                         max_val = plqy_values.max()
                         st.metric(f"Best {target}", f"{max_val:.1f}%")
-                    elif:
-                        max_val = data[target].max()
+                    elif max_val = data[target].max():
                         st.metric(f"Best {target}", f"{max_val:.2f}")
                     #try:
                      #   max_val = data[target].max()
