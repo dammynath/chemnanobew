@@ -2170,7 +2170,8 @@ def display_quantum_dots_tab(uploaded_file):
             if 'absorption_nm' in numeric_cols:
                 st.metric("Best Absorption", f"{data['absorption_nm'].max():.1f} nm")
             if 'plqy_percent' in numeric_cols:
-                st.metric("Best PLQY", f"{data['plqy_percent'].max():.1f}%")
+                plqy_values = data['plqy_percent'].clip(0, 100)
+                st.metric("Best PLQY", f"{plqy_values.max():.1f}%")
             if 'intensity' in numeric_cols:
                 st.metric("Best Intensity", f"{data['intensity'].max():.0f}")
         
