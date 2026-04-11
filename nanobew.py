@@ -2106,8 +2106,8 @@ def display_quantum_dots_tab(uploaded_file):
                        #     st.metric(f"Best {target}", f"{max_val:.2f}")
                     else:
                         st.metric(f"Best {target}", str(max_val))
-            except:
-                st.metric(f"Best {target}", "N/A")
+                    except:
+                        st.metric(f"Best {target}", "N/A")
                 with col_b:
                     if target == 'plqy_percent':
                         plqy_values = data[target].clip(0, 100)
