@@ -2248,159 +2248,159 @@ def display_quantum_dots_tab(uploaded_file):
                             st.error("Required target columns not found in data")
         
         with col2:
-    if st.button("🚀 Bayesian Optimization", use_container_width=True):
-        if 'cite_model_abs' in st.session_state and 'cite_model_int' in st.session_state:
-            with st.spinner("Running Bayesian optimization..."):
-                try:
-                    from skopt import gp_minimize
-                    from skopt.space import Real, Integer
-                    
-                    # Helper function to safely extract single float value
-                    def get_value(var, var_name):
-                        """Safely extract a single float value from variable"""
-                        if isinstance(var, (int, float)):
-                            return float(var)
-                        elif isinstance(var, (list, tuple)) and len(var) > 0:
-                            return float(var[0])
-                        elif isinstance(var, str):
-                            try:
-                                return float(var)
-                            except ValueError:
-                                st.error(f"Cannot convert {var_name}='{var}' to float")
-                                return 0.0
-                        else:
-                            st.error(f"Invalid format for {var_name}: {var}")
-                            return 0.0
-                    
-                    # Extract single values (not ranges)
-                    cucl2_val = get_value(cucl2, 'cucl2')
-                    te_salt_val = get_value(te_salt, 'te_salt')
-                    temp_val = get_value(temperature, 'temperature')
-                    time_val_single = get_value(time_val, 'time')
-                    zn_val = get_value(zn_precursor, 'zn_precursor')
-                    ph_val = get_value(pH_val, 'pH')
-                    
-                    # Define search space with ±20% variation
-                    def create_range(value, param_name, percent=20):
-                        if value == 0:
-                            low, high = 0, 10
-                        else:
-                            low = value * (1 - percent/100)
-                            high = value * (1 + percent/100)
-                        
-                        # For integer parameters
-                        if param_name in ['cucl2', 'te_salt', 'temperature', 'time', 'zn_precursor']:
-                            return Integer(int(low), int(high), name=param_name)
-                        else:  # pH as float
-                            return Real(low, high, name=param_name)
-                    
-                    space = [
-                        create_range(cucl2_val, 'cucl2', 20),
-                        create_range(te_salt_val, 'te_salt', 20),
-                        create_range(temp_val, 'temperature', 10),  # Temperature smaller range
-                        create_range(time_val_single, 'time', 25),
-                        create_range(zn_val, 'zn_precursor', 20),
-                        create_range(ph_val, 'pH', 15)
-                    ]
-                    
-                    # Get target values
-                    target_absorption = st.session_state.get('target_absorption', 600)
-                    target_intensity = st.session_state.get('target_intensity', 10000)
-                    
-                    def objective(params):
-                        x = np.array(params).reshape(1, -1)
-                        pred_abs = st.session_state['cite_model_abs'].predict(x)[0]
-                        pred_int = st.session_state['cite_model_int'].predict(x)[0]
-                        
-                        # Composite score (maximize both)
-                        score = (pred_abs / target_absorption) * 0.6 + (pred_int / target_intensity) * 0.4
-                        return -score  # Minimize negative
-                    
-                    result = gp_minimize(
-                        objective, space,
-                        n_calls=30,
-                        n_initial_points=10,
-                        random_state=42
-                    )
-                    
-                    best_params = {
-                        'cucl2_mg': result.x[0],
-                        'te_salt': result.x[1],
-                        'temperature': result.x[2],
-                        'time': result.x[3],
-                        'zn_precursor': result.x[4],
-                        'pH': result.x[5]
-                    }
-                    
-                    st.success("✅ Optimal conditions found:")
-                    for k, v in best_params.items():
-                        st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
-                    
-                    # Predict properties at optimum
-                    x_opt = np.array([result.x]).reshape(1, -1)
-                    opt_abs = st.session_state['cite_model_abs'].predict(x_opt)[0]
-                    opt_int = st.session_state['cite_model_int'].predict(x_opt)[0]
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Predicted Absorption", f"{opt_abs:.1f} nm")
-                    with col2:
-                        st.metric("Predicted Intensity", f"{opt_int:.0f}")
-                        
-                except ImportError:
-                    st.warning("scikit-optimize not installed. Using local optimization...")
-                    # Simple local search around current values
-                    try:
-                        cucl2_val = get_value(cucl2, 'cucl2')
-                        te_salt_val = get_value(te_salt, 'te_salt')
-                        temp_val = get_value(temperature, 'temperature')
-                        time_val_single = get_value(time_val, 'time')
-                        zn_val = get_value(zn_precursor, 'zn_precursor')
-                        ph_val = get_value(pH_val, 'pH')
-                        
-                        best_score = -np.inf
-                        best_params = {}
-                        
-                        # Simple grid search around current values
-                        for cucl2_delta in [-0.2, 0, 0.2]:
-                            for te_delta in [-0.2, 0, 0.2]:
-                                for temp_delta in [-0.1, 0, 0.1]:
-                                    params = [
-                                        cucl2_val * (1 + cucl2_delta),
-                                        te_salt_val * (1 + te_delta),
-                                        temp_val * (1 + temp_delta),
-                                        time_val_single,
-                                        zn_val,
-                                        ph_val
-                                    ]
-                                    
-                                    x_test = np.array([params]).reshape(1, -1)
-                                    pred_abs = st.session_state['cite_model_abs'].predict(x_test)[0]
-                                    pred_int = st.session_state['cite_model_int'].predict(x_test)[0]
-                                    score = (pred_abs / target_absorption) * 0.6 + (pred_int / target_intensity) * 0.4
-                                    
-                                    if score > best_score:
-                                        best_score = score
-                                        best_params = {
-                                            'cucl2_mg': params[0],
-                                            'te_salt': params[1],
-                                            'temperature': params[2],
-                                            'time': params[3],
-                                            'zn_precursor': params[4],
-                                            'pH': params[5]
-                                        }
-                        
-                        st.success("✅ Local optimization results:")
-                        for k, v in best_params.items():
-                            st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
+            if st.button("🚀 Bayesian Optimization", use_container_width=True):
+                if 'cite_model_abs' in st.session_state and 'cite_model_int' in st.session_state:
+                    with st.spinner("Running Bayesian optimization..."):
+                        try:
+                            from skopt import gp_minimize
+                            from skopt.space import Real, Integer
                             
-                    except Exception as e:
-                        st.error(f"Error in local optimization: {str(e)}")
-                        
-                except Exception as e:
-                    st.error(f"❌ Optimization failed: {str(e)}")
-        else:
-            st.warning("⚠️ Please train models first")
+                            # Helper function to safely extract single float value
+                            def get_value(var, var_name):
+                                """Safely extract a single float value from variable"""
+                                if isinstance(var, (int, float)):
+                                    return float(var)
+                                elif isinstance(var, (list, tuple)) and len(var) > 0:
+                                    return float(var[0])
+                                elif isinstance(var, str):
+                                    try:
+                                        return float(var)
+                                    except ValueError:
+                                        st.error(f"Cannot convert {var_name}='{var}' to float")
+                                        return 0.0
+                                else:
+                                    st.error(f"Invalid format for {var_name}: {var}")
+                                    return 0.0
+                            
+                            # Extract single values (not ranges)
+                            cucl2_val = get_value(cucl2, 'cucl2')
+                            te_salt_val = get_value(te_salt, 'te_salt')
+                            temp_val = get_value(temperature, 'temperature')
+                            time_val_single = get_value(time_val, 'time')
+                            zn_val = get_value(zn_precursor, 'zn_precursor')
+                            ph_val = get_value(pH_val, 'pH')
+                            
+                            # Define search space with ±20% variation
+                            def create_range(value, param_name, percent=20):
+                                if value == 0:
+                                    low, high = 0, 10
+                                else:
+                                    low = value * (1 - percent/100)
+                                    high = value * (1 + percent/100)
+                                
+                                # For integer parameters
+                                if param_name in ['cucl2', 'te_salt', 'temperature', 'time', 'zn_precursor']:
+                                    return Integer(int(low), int(high), name=param_name)
+                                else:  # pH as float
+                                    return Real(low, high, name=param_name)
+                            
+                            space = [
+                                create_range(cucl2_val, 'cucl2', 20),
+                                create_range(te_salt_val, 'te_salt', 20),
+                                create_range(temp_val, 'temperature', 10),  # Temperature smaller range
+                                create_range(time_val_single, 'time', 25),
+                                create_range(zn_val, 'zn_precursor', 20),
+                                create_range(ph_val, 'pH', 15)
+                            ]
+                            
+                            # Get target values
+                            target_absorption = st.session_state.get('target_absorption', 600)
+                            target_intensity = st.session_state.get('target_intensity', 10000)
+                            
+                            def objective(params):
+                                x = np.array(params).reshape(1, -1)
+                                pred_abs = st.session_state['cite_model_abs'].predict(x)[0]
+                                pred_int = st.session_state['cite_model_int'].predict(x)[0]
+                                
+                                # Composite score (maximize both)
+                                score = (pred_abs / target_absorption) * 0.6 + (pred_int / target_intensity) * 0.4
+                                return -score  # Minimize negative
+                            
+                            result = gp_minimize(
+                                objective, space,
+                                n_calls=30,
+                                n_initial_points=10,
+                                random_state=42
+                            )
+                            
+                            best_params = {
+                                'cucl2_mg': result.x[0],
+                                'te_salt': result.x[1],
+                                'temperature': result.x[2],
+                                'time': result.x[3],
+                                'zn_precursor': result.x[4],
+                                'pH': result.x[5]
+                            }
+                            
+                            st.success("✅ Optimal conditions found:")
+                            for k, v in best_params.items():
+                                st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
+                            
+                            # Predict properties at optimum
+                            x_opt = np.array([result.x]).reshape(1, -1)
+                            opt_abs = st.session_state['cite_model_abs'].predict(x_opt)[0]
+                            opt_int = st.session_state['cite_model_int'].predict(x_opt)[0]
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Predicted Absorption", f"{opt_abs:.1f} nm")
+                            with col2:
+                                st.metric("Predicted Intensity", f"{opt_int:.0f}")
+                                
+                        except ImportError:
+                            st.warning("scikit-optimize not installed. Using local optimization...")
+                            # Simple local search around current values
+                            try:
+                                cucl2_val = get_value(cucl2, 'cucl2')
+                                te_salt_val = get_value(te_salt, 'te_salt')
+                                temp_val = get_value(temperature, 'temperature')
+                                time_val_single = get_value(time_val, 'time')
+                                zn_val = get_value(zn_precursor, 'zn_precursor')
+                                ph_val = get_value(pH_val, 'pH')
+                                
+                                best_score = -np.inf
+                                best_params = {}
+                                
+                                # Simple grid search around current values
+                                for cucl2_delta in [-0.2, 0, 0.2]:
+                                    for te_delta in [-0.2, 0, 0.2]:
+                                        for temp_delta in [-0.1, 0, 0.1]:
+                                            params = [
+                                                cucl2_val * (1 + cucl2_delta),
+                                                te_salt_val * (1 + te_delta),
+                                                temp_val * (1 + temp_delta),
+                                                time_val_single,
+                                                zn_val,
+                                                ph_val
+                                            ]
+                                            
+                                            x_test = np.array([params]).reshape(1, -1)
+                                            pred_abs = st.session_state['cite_model_abs'].predict(x_test)[0]
+                                            pred_int = st.session_state['cite_model_int'].predict(x_test)[0]
+                                            score = (pred_abs / target_absorption) * 0.6 + (pred_int / target_intensity) * 0.4
+                                            
+                                            if score > best_score:
+                                                best_score = score
+                                                best_params = {
+                                                    'cucl2_mg': params[0],
+                                                    'te_salt': params[1],
+                                                    'temperature': params[2],
+                                                    'time': params[3],
+                                                    'zn_precursor': params[4],
+                                                    'pH': params[5]
+                                                }
+                                
+                                st.success("✅ Local optimization results:")
+                                for k, v in best_params.items():
+                                    st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
+                                    
+                            except Exception as e:
+                                st.error(f"Error in local optimization: {str(e)}")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Optimization failed: {str(e)}")
+                else:
+                    st.warning("⚠️ Please train models first")
         
         with col3:
             if st.button("📊 Show Pareto Front", use_container_width=True):
