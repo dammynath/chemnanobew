@@ -2123,18 +2123,19 @@ def display_quantum_dots_tab(uploaded_file):
                     except Exception as e:
                         st.metric(f"Mean {target}", "N/A")
     
+    def display_cis_te_optimizer(data, qd_manager):
+        st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
     # ========================================================================
     # Tab 2: CIS-Te/ZnS Optimizer
     # ========================================================================
     #def display_cis_te_optimizer(data, qd_manager):
         #"""Specialized CIS-Te/ZnS Quantum Dot Optimizer with updated experimental parameters"""
     with qd_tabs[1]:
+        col1, col2 = st.columns(2)
         cite_data = display_cis_te_optimizer(data, qd_manager)
         if cite_data is not None:
             data = cite_data
-    def display_cis_te_optimizer(data, qd_manager):
-        st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
-        
+            
         st.markdown("""
         <div class='info-box'>
         <strong>Based on Experimental Results (Dr. Adimula, 2026)</strong><br><br>
@@ -2147,7 +2148,7 @@ def display_quantum_dots_tab(uploaded_file):
         </div>
         """, unsafe_allow_html=True)
         
-        col1, col2 = st.columns(2)
+        
         
         with col1:
             st.markdown("#### Parameter Ranges (Based on Report)")
