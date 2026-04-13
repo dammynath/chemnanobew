@@ -2456,7 +2456,7 @@ def display_quantum_dots_tab(uploaded_file):
                         features = st.session_state['cite_features']
                         
                         # Generate grid of points
-                        n_grid = 8
+                        n_grid = 6
                         grid_points = []
                         
                         for f in features[:6]:
