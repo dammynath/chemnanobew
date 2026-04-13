@@ -2126,11 +2126,7 @@ def display_quantum_dots_tab(uploaded_file):
     # ========================================================================
     # Tab 2: CIS-Te/ZnS Optimizer
     # ========================================================================
-    with qd_tabs[1]:
-        cite_data = display_cis_te_optimizer(data, qd_manager)
-        if cite_data is not None:
-            data = cite_data
-
+def display_cis_te_optimizer(data, qd_manager):
     """Specialized CIS-Te/ZnS Quantum Dot Optimizer with updated experimental parameters"""
     
     st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
@@ -2147,6 +2143,11 @@ def display_quantum_dots_tab(uploaded_file):
     </div>
     """, unsafe_allow_html=True)
     
+    with qd_tabs[1]:
+        cite_data = display_cis_te_optimizer(data, qd_manager)
+        if cite_data is not None:
+            data = cite_data
+
     col1, col2 = st.columns(2)
     
     with col1:
