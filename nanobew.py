@@ -2126,7 +2126,7 @@ def display_quantum_dots_tab(uploaded_file):
     # ========================================================================
     # Tab 2: CIS-Te/ZnS Optimizer
     # ========================================================================
-    def display_cis_te_optimizer(data, qd_manager):
+def display_cis_te_optimizer(data, qd_manager):
         #"""Specialized CIS-Te/ZnS Quantum Dot Optimizer with updated experimental parameters"""
     with qd_tabs[1]:
         cite_data = display_cis_te_optimizer(data, qd_manager)
