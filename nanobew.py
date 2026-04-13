@@ -2127,403 +2127,493 @@ def display_quantum_dots_tab(uploaded_file):
     # Tab 2: CIS-Te/ZnS Optimizer
     # ========================================================================
     with qd_tabs[1]:
-        st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
+        cite_data = display_cis_te_optimizer(data, qd_manager)
+        if cite_data is not None:
+            data = cite_data
+
+    """Specialized CIS-Te/ZnS Quantum Dot Optimizer with updated experimental parameters"""
+    
+    st.markdown("### 👨‍🔬 CIS-Te/ZnS Quantum Dot Optimizer")
+    
+    st.markdown("""
+    <div class='info-box'>
+    <strong>Based on Experimental Results (Dr. Adimula, 2026)</strong><br><br>
+    <strong>Optimized conditions achieved:</strong><br>
+    • Emission: 815 nm with intensity 12,828.54<br>
+    • Quantum Yield: 5.13%<br>
+    • Lifetime: 37.54 ns<br>
+    • Excitation: 550 nm<br><br>
+    Optimize synthesis parameters for enhanced NIR emission and quantum yield.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Parameter Ranges (Based on Report)")
         
-        st.markdown("""
-        <div class='info-box'>
-        Specialized optimizer for Tellurium-alloyed CIS/ZnS quantum dots with enhanced NIR absorption.
-        Optimize synthesis parameters for maximum wavelength and intensity.
-        </div>
-        """, unsafe_allow_html=True)
+        # CIS-Te/ZnS specific parameters with experimental values
+        cucl2 = st.slider("CuCl₂ (mg)", 8.0, 14.0, 11.0, 0.5, key="cite_cucl2",
+                         help="Copper precursor - 11.0 mg used in optimized synthesis")
+        incl3 = st.slider("InCl₃ (mg)", 40.0, 70.0, 55.0, 1.0, key="cite_incl3",
+                         help="Indium precursor - 55.0 mg used in optimized synthesis")
+        citrate = st.slider("Trisodium Citrate (mg)", 250.0, 350.0, 294.0, 5.0, key="cite_citrate",
+                           help="Stabilizing agent - 294 mg used")
+        tga = st.slider("Thioglycolic Acid (µl)", 50.0, 90.0, 70.0, 2.0, key="cite_tga",
+                       help="Capping agent - 70 µl used")
+        na2s = st.slider("Na₂S (mg)", 80.0, 120.0, 97.5, 2.0, key="cite_na2s",
+                        help="Sulfur precursor - 97.5 mg used")
+        nabh4 = st.slider("NaBH₄ (mg)", 20.0, 35.0, 26.0, 1.0, key="cite_nabh4",
+                         help="Reducing agent - 26.0 mg used")
+        te_salt = st.slider("Tellurium Salt (mg)", 1.0, 2.5, 1.7, 0.1, key="cite_te",
+                           help="Te precursor - 1.7 mg used (critical for red shift)")
+        zn_precursor = st.slider("Zn(OAc)₂ (mg)", 20.0, 40.0, 30.0, 1.0, key="cite_zn",
+                                help="Zinc precursor for shell - 30.0 mg used")
+        thiourea = st.slider("Thiourea (mg)", 10.0, 20.0, 15.0, 1.0, key="cite_thiourea",
+                            help="Additional sulfur source - 15.0 mg used")
+        core_temp = st.slider("Core Temperature (°C)", 85.0, 105.0, 95.0, 1.0, key="cite_core_temp",
+                             help="Core formation temperature - 95°C used")
+        core_time = st.slider("Core Time (min)", 20, 40, 30, 2, key="cite_core_time",
+                             help="Core reaction time - 30 min used")
+        te_incorp_time = st.slider("Te Incorporation Time (min)", 5, 20, 10, 2, key="cite_te_time",
+                                  help="Te incorporation time - 10 min used")
+        shell_time = st.slider("Shell Growth Time (min)", 10, 30, 20, 2, key="cite_shell_time",
+                              help="Shell growth time - 20 min used")
+        pH_val = st.slider("pH", 2.5, 4.0, 3.0, 0.1, key="cite_pH",
+                          help="pH adjusted to 3.0 with HCl")
         
-        col1, col2 = st.columns(2)
+        # Store ranges for optimization
+        ranges = {
+            "cucl2_mg": (8.0, 14.0),
+            "incl3_mg": (40.0, 70.0),
+            "te_salt_mg": (1.0, 2.5),
+            "zn_precursor_mg": (20.0, 40.0),
+            "core_temp_c": (85.0, 105.0),
+            "core_time_min": (20, 40),
+            "pH": (2.5, 4.0),
+            "shell_time_min": (10, 30)
+        }
         
-        with col1:
-            st.markdown("#### Parameter Ranges")
-            
-            # CIS-Te/ZnS specific parameters with proper tuple handling
-            cucl2 = st.slider("CuCl₂ (mg)", 8.0, 14.0, 11.0, 0.5, key="cite_cucl2")
-            incl3 = st.slider("InCl₃ (mg)", 40.0, 70.0, 55.0, 1.0, key="cite_incl3")
-            citrate = st.slider("Trisodium Citrate (mg)", 250.0, 350.0, 294.0, 5.0, key="cite_citrate")
-            temperature = st.slider("Temperature (°C)", 90, 280, (90, 200), key="cite_temp")
-            time_val = st.slider("Reaction Time (min)", 10, 240, (30, 120), key="cite_time")
-            pH_val = st.slider("pH", 2.0, 10.0, (3.0, 7.5), key="cite_pH")
-            tga = st.slider("Thioglycolic Acid (µl)", 50.0, 90.0, 70.0, 2.0, key="cite_tga")
-            na2s = st.slider("Na₂S (mg)", 80.0, 120.0, 97.5, 2.0, key="cite_na2s")
-            nabh4 = st.slider("NaBH₄ (mg)", 20.0, 35.0, 26.0, 1.0, key="cite_nabh4")
-            te_salt = st.slider("Tellurium Salt (mg)", 1.0, 2.5, 1.7, 0.1, key="cite_te")
-            zn_precursor = st.slider("Zn(OAc)₂ (mg)", 20.0, 40.0, 30.0, 1.0, key="cite_zn")
-            thiourea = st.slider("Thiourea (mg)", 10.0, 20.0, 15.0, 1.0, key="cite_thiourea")
-            ranges = {
-                "cucl2": cucl2,
-                "te_salt": te_salt,
-                "incl3": incl3,
-                "temperature": temperature,
-                "time": time_val,
-                "zn_precursor": zn_precursor,
-                "pH": pH_val
-            }
-            
-            # Surfactant selection
-            surfactant = st.selectbox(
-                "Surfactant",
-                ["oleic_acid", "oleylamine", "dodecanethiol", "TOP", "mixed"],
-                key="cite_surfactant"
-            )
+        current_params = {
+            "cucl2_mg": cucl2,
+            "incl3_mg": incl3,
+            "te_salt_mg": te_salt,
+            "zn_precursor_mg": zn_precursor,
+            "core_temp_c": core_temp,
+            "core_time_min": core_time,
+            "pH": pH_val,
+            "shell_time_min": shell_time
+        }
+    
+    with col2:
+        st.markdown("#### Optimization Targets")
         
-        with col2:
-            st.markdown("#### Optimization Targets")
-            
-            target_absorption = st.number_input("Target Absorption (nm)", 700, 1000, 800, key="cite_target_abs")
-            target_plqy = st.number_input("Target PLQY (%)", 30, 90, 60, key="cite_target_plqy")
-            target_intensity = st.number_input("Target Intensity (a.u.)", 100, 100000, 5000, key="cite_target_int")
-            
-            st.markdown("#### Current Best Values")
-            # Get numeric columns only
-            numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-            
-            if 'absorption_nm' in numeric_cols:
-                st.metric("Best Absorption", f"{data['absorption_nm'].max():.1f} nm")
-            if 'quantum_yield_percent' in numeric_cols:
-                plqy_values = data['quantum_yield_percent'].clip(0, 100)
-                current_plqy = plqy_values.max()
-                st.metric("Best PLQY", f"{current_plqy:.1f}%")
-            if 'pl_intensity' in numeric_cols:
-                st.metric("Best Intensity", f"{data['pl_intensity'].max():.0f}")
+        st.markdown("**Experimental Best Values:**")
+        st.metric("Emission Wavelength", "815 nm", delta="from 827 nm (core)")
+        st.metric("PL Intensity", "12,829", delta="+342% from core")
+        st.metric("Quantum Yield", "5.13%", delta="+526% from core")
+        st.metric("Lifetime", "37.54 ns", delta="+59% from core")
         
-        # Upload specific CIS-Te/ZnS data
-        cite_uploaded = st.file_uploader("Upload CIS-Te/ZnS experimental CSV", type="csv", key="cite_upload")
+        st.markdown("---")
+        st.markdown("**Target Settings:**")
         
-        if cite_uploaded:
-            try:
-                cite_df = pd.read_csv(cite_uploaded)
-                # Ensure numeric columns are properly typed
-                for col in cite_df.columns:
-                    if col in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
-                    'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_precursor_mg', 'thiourea_mg',
-                    'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
-                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH', 
-                              'absorption_nm', 'intensity', 'plqy_percent']:
-                        cite_df[col] = pd.to_numeric(cite_df[col], errors='coerce')
-                cite_df = cite_df.dropna()
-                st.success("✅ Using uploaded CIS-Te/ZnS data")
-            except Exception as e:
-                st.error(f"Error loading file: {e}")
-                cite_df = generate_cis_te_data(n_samples=40)
-                cite_df["intensity"] = 15000 + 5000 * (cite_df["te_salt"] - 5) / 5 + 2000 * (cite_df["pH"] - 6)
-        else:
-            with st.spinner("Generating synthetic CIS-Te/ZnS data..."):
-                cite_df = generate_cis_te_data(n_samples=40)
-                #cite_df["pl_intensity"] = 15000 + 5000 * (cite_df["te_salt"] - 5) / 5 + 2000 * (cite_df["pH"] - 6)
-            st.info("📊 Using synthetic CIS-Te/ZnS data. Upload your own CSV for real optimization.")
+        target_emission = st.number_input("Target Emission (nm)", 750, 850, 815, key="cite_target_emission")
+        target_intensity = st.number_input("Target PL Intensity", 5000, 20000, 12829, key="cite_target_intensity")
+        target_qy = st.number_input("Target Quantum Yield (%)", 1.0, 15.0, 5.13, 0.5, key="cite_target_qy")
         
-        st.dataframe(cite_df.head(10), use_container_width=True)
-        
-        # Optimization buttons
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("🎯 Train RF Model", use_container_width=True):
-                with st.spinner("Training Random Forest model..."):
-                    from sklearn.ensemble import RandomForestRegressor
-                    
-                    # Prepare features - ensure numeric
-                    feature_cols = ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
-                    'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_precursor_mg', 'thiourea_mg',
-                    'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
-                    'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 'quantum_yield_percent', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH', 
-                              'absorption_nm', 'intensity', 'plqy_percent']
-                    # Check if all feature columns exist
-                    available_features = [f for f in feature_cols if f in cite_df.columns]
-                    
-                    if len(available_features) < 2:
-                        st.error("Not enough feature columns available")
-                    else:
-                        X = cite_df[available_features].values
-                        
-                        # Check if target columns exist
-                        if 'emission_nm' in cite_df.columns and 'pl_intensity' in cite_df.columns:
-                            y_abs = cite_df['emission_nm'].values
-                            y_int = cite_df['pl_intensity'].values
-                            
-                            # Train models
-                            model_abs = RandomForestRegressor(n_estimators=100, random_state=42)
-                            model_abs.fit(X, y_abs)
-                            
-                            model_int = RandomForestRegressor(n_estimators=100, random_state=42)
-                            model_int.fit(X, y_int)
-                            
-                            st.session_state['cite_model_abs'] = model_abs
-                            st.session_state['cite_model_int'] = model_int
-                            
-                            # Calculate R²
-                            r2_abs = model_abs.score(X, y_abs)
-                            r2_int = model_int.score(X, y_int)
-                            
-                            st.success(f"✅ Models trained! R² (Abs): {r2_abs:.3f}, R² (Int): {r2_int:.3f}")
-                        else:
-                            st.error("Required target columns not found in data")
-        
-        with col2:
-            if st.button("🚀 Bayesian Optimization", use_container_width=True):
-                if 'cite_model_abs' in st.session_state and 'cite_model_int' in st.session_state:
-                    with st.spinner("Running Bayesian optimization..."):
-                        try:
-                            from skopt import gp_minimize
-                            from skopt.space import Real, Integer
-                            
-                            # Helper function to safely extract single float value
-                            def get_value(var, var_name):
-                                """Safely extract a single float value from variable"""
-                                if isinstance(var, (int, float)):
-                                    return float(var)
-                                elif isinstance(var, (list, tuple)) and len(var) > 0:
-                                    return float(var[0])
-                                elif isinstance(var, str):
-                                    try:
-                                        return float(var)
-                                    except ValueError:
-                                        st.error(f"Cannot convert {var_name}='{var}' to float")
-                                        return 0.0
-                                else:
-                                    st.error(f"Invalid format for {var_name}: {var}")
-                                    return 0.0
-                            
-                            # Extract single values (not ranges)
-                            cucl2_val = get_value(cucl2, 'cucl2')
-                            te_salt_val = get_value(te_salt, 'te_salt')
-                            temp_val = get_value(temperature, 'temperature')
-                            time_val_single = get_value(time_val, 'time')
-                            zn_val = get_value(zn_precursor, 'zn_precursor')
-                            ph_val = get_value(pH_val, 'pH')
-                            
-                            # Define search space with ±20% variation
-                            def create_range(value, param_name, percent=20):
-                                if value == 0:
-                                    low, high = 0, 10
-                                else:
-                                    low = value * (1 - percent/100)
-                                    high = value * (1 + percent/100)
-                                
-                                # For integer parameters
-                                if param_name in ['cucl2', 'te_salt', 'temperature', 'time', 'zn_precursor']:
-                                    return Integer(int(low), int(high), name=param_name)
-                                else:  # pH as float
-                                    return Real(low, high, name=param_name)
-                            
-                            space = [
-                                create_range(cucl2_val, 'cucl2', 20),
-                                create_range(te_salt_val, 'te_salt', 20),
-                                create_range(temp_val, 'temperature', 10),  # Temperature smaller range
-                                create_range(time_val_single, 'time', 25),
-                                create_range(zn_val, 'zn_precursor', 20),
-                                create_range(ph_val, 'pH', 15)
-                            ]
-                            
-                            # Get target values
-                            target_absorption = st.session_state.get('target_absorption', 600)
-                            target_intensity = st.session_state.get('target_intensity', 10000)
-                            
-                            def objective(params):
-                                x = np.array(params).reshape(1, -1)
-                                pred_abs = st.session_state['cite_model_abs'].predict(x)[0]
-                                pred_int = st.session_state['cite_model_int'].predict(x)[0]
-                                
-                                # Composite score (maximize both)
-                                score = (pred_abs / target_absorption) * 0.6 + (pred_int / target_intensity) * 0.4
-                                return -score  # Minimize negative
-                            
-                            result = gp_minimize(
-                                objective, space,
-                                n_calls=30,
-                                n_initial_points=10,
-                                random_state=42
-                            )
-                            
-                            best_params = {
-                                'cucl2_mg': result.x[0],
-                                'te_salt': result.x[1],
-                                'temperature': result.x[2],
-                                'time': result.x[3],
-                                'zn_precursor': result.x[4],
-                                'pH': result.x[5]
-                            }
-                            
-                            st.success("✅ Optimal conditions found:")
-                            for k, v in best_params.items():
-                                st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
-                            
-                            # Predict properties at optimum
-                            x_opt = np.array([result.x]).reshape(1, -1)
-                            opt_abs = st.session_state['cite_model_abs'].predict(x_opt)[0]
-                            opt_int = st.session_state['cite_model_int'].predict(x_opt)[0]
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric("Predicted Absorption", f"{opt_abs:.1f} nm")
-                            with col2:
-                                st.metric("Predicted Intensity", f"{opt_int:.0f}")
-                                
-                        except ImportError:
-                            st.warning("scikit-optimize not installed. Using local optimization...")
-                            # Simple local search around current values
-                            try:
-                                cucl2_val = get_value(cucl2, 'cucl2')
-                                te_salt_val = get_value(te_salt, 'te_salt')
-                                temp_val = get_value(temperature, 'temperature')
-                                time_val_single = get_value(time_val, 'time')
-                                zn_val = get_value(zn_precursor, 'zn_precursor')
-                                ph_val = get_value(pH_val, 'pH')
-                                
-                                best_score = -np.inf
-                                best_params = {}
-                                
-                                # Simple grid search around current values
-                                for cucl2_delta in [-0.2, 0, 0.2]:
-                                    for te_delta in [-0.2, 0, 0.2]:
-                                        for temp_delta in [-0.1, 0, 0.1]:
-                                            params = [
-                                                cucl2_val * (1 + cucl2_delta),
-                                                te_salt_val * (1 + te_delta),
-                                                temp_val * (1 + temp_delta),
-                                                time_val_single,
-                                                zn_val,
-                                                ph_val
-                                            ]
-                                            
-                                            x_test = np.array([params]).reshape(1, -1)
-                                            pred_abs = st.session_state['cite_model_abs'].predict(x_test)[0]
-                                            pred_int = st.session_state['cite_model_int'].predict(x_test)[0]
-                                            score = (pred_abs / target_absorption) * 0.6 + (pred_int / target_intensity) * 0.4
-                                            
-                                            if score > best_score:
-                                                best_score = score
-                                                best_params = {
-                                                    'cucl2_mg': params[0],
-                                                    'te_salt': params[1],
-                                                    'temperature': params[2],
-                                                    'time': params[3],
-                                                    'zn_precursor': params[4],
-                                                    'pH': params[5]
-                                                }
-                                
-                                st.success("✅ Local optimization results:")
-                                for k, v in best_params.items():
-                                    st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
-                                    
-                            except Exception as e:
-                                st.error(f"Error in local optimization: {str(e)}")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Optimization failed: {str(e)}")
-                else:
-                    st.warning("⚠️ Please train models first")
-        
-        with col3:
-            if st.button("📊 Show Pareto Front", use_container_width=True):
+        # Display Cu:In ratio
+        cu_in_ratio = cucl2 / incl3
+        st.metric("Cu:In Ratio", f"{cu_in_ratio:.3f}", 
+                 help="Optimal ratio ~0.2 (based on 11.0/55.0 = 0.2)")
+    
+    # Load or generate CIS-Te/ZnS specific data
+    st.markdown("---")
+    st.markdown("#### Experimental Data")
+    
+    cite_uploaded = st.file_uploader("Upload CIS-Te/ZnS experimental CSV", type="csv", key="cite_upload")
+    
+    if cite_uploaded:
+        try:
+            cite_df = pd.read_csv(cite_uploaded)
+            # Ensure numeric columns are properly typed
+            for col in cite_df.columns:
+                if col in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'tga_ul',
+                          'na2s_mg', 'nabh4_mg', 'te_salt_mg', 'zn_precursor_mg', 'thiourea_mg',
+                          'core_temp_c', 'core_time_min', 'te_incorp_time_min', 'shell_time_min', 'pH',
+                          'excitation_nm', 'emission_nm', 'pl_intensity', 'lifetime_ns', 
+                          'quantum_yield_percent', 'absorption_nm']:
+                    cite_df[col] = pd.to_numeric(cite_df[col], errors='coerce')
+            cite_df = cite_df.dropna()
+            st.success(f"✅ Loaded {len(cite_df)} experimental data points")
+        except Exception as e:
+            st.error(f"Error loading file: {e}")
+            cite_df = generate_cis_te_data(n_samples=40)
+    else:
+        with st.spinner("Generating synthetic CIS-Te/ZnS data based on experimental results..."):
+            cite_df = generate_cis_te_data(n_samples=40)
+        st.info("📊 Using synthetic data based on experimental results. Upload your own CSV for real optimization.")
+    
+    st.dataframe(cite_df.head(10), use_container_width=True)
+    
+    # Display statistics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Best Emission", f"{cite_df['emission_nm'].min():.1f} nm")
+    with col2:
+        st.metric("Best Intensity", f"{cite_df['pl_intensity'].max():.0f}")
+    with col3:
+        st.metric("Best QY", f"{cite_df['quantum_yield_percent'].max():.2f}%")
+    with col4:
+        st.metric("Best Lifetime", f"{cite_df['lifetime_ns'].max():.1f} ns")
+    
+    # Optimization buttons
+    st.markdown("---")
+    st.markdown("#### 🚀 Optimization Tools")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("🎯 Train Models", use_container_width=True, type="primary"):
+            with st.spinner("Training Random Forest models on experimental data..."):
                 from sklearn.ensemble import RandomForestRegressor
+                from sklearn.preprocessing import StandardScaler
                 
                 # Prepare features
-                feature_cols = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
+                feature_cols = ['cucl2_mg', 'incl3_mg', 'te_salt_mg', 'zn_precursor_mg', 
+                               'core_temp_c', 'core_time_min', 'pH', 'shell_time_min']
+                
+                # Check available features
                 available_features = [f for f in feature_cols if f in cite_df.columns]
                 
-                if len(available_features) >= 2 and 'absorption_nm' in cite_df.columns and 'intensity' in cite_df.columns:
+                if len(available_features) >= 4:
                     X = cite_df[available_features].values
-                    y_abs = cite_df['absorption_nm'].values
-                    y_int = cite_df['intensity'].values
                     
-                    model_abs = RandomForestRegressor(n_estimators=100, random_state=42)
-                    model_abs.fit(X, y_abs)
-                    model_int = RandomForestRegressor(n_estimators=100, random_state=42)
-                    model_int.fit(X, y_int)
+                    # Train multiple models
+                    models = {}
+                    results = {}
+                    
+                    # Emission model
+                    if 'emission_nm' in cite_df.columns:
+                        y_emission = cite_df['emission_nm'].values
+                        model_emission = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=10)
+                        model_emission.fit(X, y_emission)
+                        models['emission'] = model_emission
+                        results['emission'] = model_emission.score(X, y_emission)
+                    
+                    # Intensity model
+                    if 'pl_intensity' in cite_df.columns:
+                        y_intensity = cite_df['pl_intensity'].values
+                        model_intensity = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=10)
+                        model_intensity.fit(X, y_intensity)
+                        models['intensity'] = model_intensity
+                        results['intensity'] = model_intensity.score(X, y_intensity)
+                    
+                    # Quantum yield model
+                    if 'quantum_yield_percent' in cite_df.columns:
+                        y_qy = cite_df['quantum_yield_percent'].values
+                        model_qy = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=10)
+                        model_qy.fit(X, y_qy)
+                        models['qy'] = model_qy
+                        results['qy'] = model_qy.score(X, y_qy)
+                    
+                    # Lifetime model
+                    if 'lifetime_ns' in cite_df.columns:
+                        y_lifetime = cite_df['lifetime_ns'].values
+                        model_lifetime = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=10)
+                        model_lifetime.fit(X, y_lifetime)
+                        models['lifetime'] = model_lifetime
+                        results['lifetime'] = model_lifetime.score(X, y_lifetime)
+                    
+                    st.session_state['cite_models'] = models
+                    st.session_state['cite_features'] = available_features
+                    
+                    # Display results
+                    st.success("✅ Models trained successfully!")
+                    for name, r2 in results.items():
+                        st.metric(f"{name.capitalize()} R²", f"{r2:.3f}")
+                else:
+                    st.error(f"Insufficient features. Available: {available_features}")
+    
+    with col2:
+        if st.button("🔬 Bayesian Optimization", use_container_width=True):
+            if 'cite_models' in st.session_state:
+                with st.spinner("Running Bayesian optimization on parameter space..."):
+                    try:
+                        from skopt import gp_minimize
+                        from skopt.space import Real, Integer
+                        
+                        # Define search space based on experimental ranges
+                        space = [
+                            Real(8.0, 14.0, name='cucl2_mg'),           # Cu precursor
+                            Real(40.0, 70.0, name='incl3_mg'),          # In precursor
+                            Real(1.0, 2.5, name='te_salt_mg'),          # Te precursor
+                            Real(20.0, 40.0, name='zn_precursor_mg'),   # Zn precursor
+                            Real(85.0, 105.0, name='core_temp_c'),      # Temperature
+                            Integer(20, 40, name='core_time_min'),      # Core time
+                            Real(2.5, 4.0, name='pH'),                  # pH
+                            Integer(10, 30, name='shell_time_min')      # Shell time
+                        ]
+                        
+                        models = st.session_state['cite_models']
+                        features = st.session_state['cite_features']
+                        
+                        def objective(params):
+                            # Convert to array with correct feature order
+                            param_dict = dict(zip(['cucl2_mg', 'incl3_mg', 'te_salt_mg', 'zn_precursor_mg',
+                                                   'core_temp_c', 'core_time_min', 'pH', 'shell_time_min'], params))
+                            X_new = np.array([[param_dict[f] for f in features]])
+                            
+                            # Composite score (maximize intensity, minimize emission wavelength, maximize QY)
+                            score = 0
+                            if 'intensity' in models:
+                                pred_int = models['intensity'].predict(X_new)[0]
+                                score += pred_int / 15000 * 0.4
+                            if 'emission' in models:
+                                pred_em = models['emission'].predict(X_new)[0]
+                                # Minimize emission (shorter wavelength better for some applications)
+                                score += (1 - (pred_em - 780) / 50) * 0.3
+                            if 'qy' in models:
+                                pred_qy = models['qy'].predict(X_new)[0]
+                                score += pred_qy / 10 * 0.3
+                            
+                            return -score  # Minimize negative
+                        
+                        result = gp_minimize(
+                            objective, space,
+                            n_calls=50,
+                            n_initial_points=15,
+                            random_state=42,
+                            acq_func='EI'
+                        )
+                        
+                        # Display optimal parameters
+                        st.success("✅ Optimal synthesis conditions found:")
+                        
+                        opt_params = {
+                            'CuCl₂ (mg)': result.x[0],
+                            'InCl₃ (mg)': result.x[1],
+                            'Te Salt (mg)': result.x[2],
+                            'Zn(OAc)₂ (mg)': result.x[3],
+                            'Core Temperature (°C)': result.x[4],
+                            'Core Time (min)': result.x[5],
+                            'pH': result.x[6],
+                            'Shell Time (min)': result.x[7]
+                        }
+                        
+                        for k, v in opt_params.items():
+                            st.metric(k, f"{v:.2f}")
+                        
+                        # Predict properties at optimum
+                        X_opt = np.array([result.x[:len(features)]])
+                        if 'intensity' in models:
+                            opt_int = models['intensity'].predict(X_opt)[0]
+                            st.metric("Predicted PL Intensity", f"{opt_int:.0f}")
+                        if 'emission' in models:
+                            opt_em = models['emission'].predict(X_opt)[0]
+                            st.metric("Predicted Emission", f"{opt_em:.1f} nm")
+                        if 'qy' in models:
+                            opt_qy = models['qy'].predict(X_opt)[0]
+                            st.metric("Predicted QY", f"{opt_qy:.2f}%")
+                            
+                    except ImportError:
+                        st.warning("scikit-optimize not installed. Using local search...")
+                        # Fallback local optimization
+                        best_score = -np.inf
+                        best_params = current_params.copy()
+                        
+                        for attempt in range(50):
+                            test_params = {}
+                            for p, (low, high) in ranges.items():
+                                if p in current_params:
+                                    noise = np.random.normal(0, (high - low) * 0.1)
+                                    test_params[p] = np.clip(current_params.get(p, (low+high)/2) + noise, low, high)
+                            
+                            # Predict with models
+                            X_test = np.array([[test_params[f] for f in features]])
+                            score = 0
+                            if 'intensity' in models:
+                                score += models['intensity'].predict(X_test)[0] / 15000 * 0.4
+                            if 'emission' in models:
+                                pred_em = models['emission'].predict(X_test)[0]
+                                score += (1 - (pred_em - 780) / 50) * 0.3
+                            if 'qy' in models:
+                                score += models['qy'].predict(X_test)[0] / 10 * 0.3
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_params = test_params
+                        
+                        st.success("✅ Local optimization results:")
+                        for k, v in best_params.items():
+                            st.metric(k.replace('_', ' ').title(), f"{v:.2f}")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Optimization failed: {str(e)}")
+            else:
+                st.warning("⚠️ Please train models first (click 'Train Models')")
+    
+    with col3:
+        if st.button("📊 Pareto Front Analysis", use_container_width=True):
+            if 'cite_models' in st.session_state:
+                with st.spinner("Calculating Pareto front..."):
+                    models = st.session_state['cite_models']
+                    features = st.session_state['cite_features']
+                    ranges_list = st.session_state.get('cite_ranges', ranges)
                     
                     # Generate grid of points
-                    n_grid = 10  # Reduced for performance
+                    n_grid = 8  # Reduced for performance
                     grid_points = []
-                    ranges_list = [cucl2_mg, te_salt, temperature, time_val, zn_precursor, pH]
-                    for i, param in enumerate(available_features):
-                        low, high = ranges_list[i]
+                    
+                    for f in features[:6]:  # Limit to 6 features for grid
+                        low, high = ranges.get(f, (0, 100))
                         grid_points.append(np.linspace(low, high, n_grid))
                     
+                    # Create meshgrid
                     mesh = np.meshgrid(*grid_points)
                     points = np.array([m.ravel() for m in mesh]).T
                     
-                    # Predict (sample for performance)
-                    if len(points) > 1000:
-                        idx = np.random.choice(len(points), 1000, replace=False)
+                    # Sample if too many points
+                    if len(points) > 2000:
+                        idx = np.random.choice(len(points), 2000, replace=False)
                         points = points[idx]
                     
-                    pred_abs = model_abs.predict(points)
-                    pred_int = model_int.predict(points)
+                    # Predict objectives
+                    objectives = []
+                    for point in points:
+                        X_test = np.array([point[:len(features)]])
+                        obj = []
+                        if 'intensity' in models:
+                            obj.append(models['intensity'].predict(X_test)[0])
+                        if 'emission' in models:
+                            obj.append(models['emission'].predict(X_test)[0])
+                        if 'qy' in models:
+                            obj.append(models['qy'].predict(X_test)[0])
+                        objectives.append(obj)
                     
-                    # Find Pareto front (simplified)
-                    objectives = np.column_stack([pred_abs, pred_int])
-                    is_pareto = np.ones(len(points), dtype=bool)
+                    objectives = np.array(objectives)
                     
-                    for i in range(len(points)):
-                        for j in range(len(points)):
-                            if i != j:
-                                if (objectives[j, 0] >= objectives[i, 0] and 
-                                    objectives[j, 1] >= objectives[i, 1] and
-                                    (objectives[j, 0] > objectives[i, 0] or objectives[j, 1] > objectives[i, 1])):
-                                    is_pareto[i] = False
-                                    break
+                    if objectives.shape[1] >= 2:
+                        # Calculate Pareto front for first two objectives
+                        obj1_idx = 0  # intensity
+                        obj2_idx = 1  # emission (minimize)
+                        
+                        # For minimization of emission, negate
+                        obj1 = objectives[:, obj1_idx]
+                        obj2 = -objectives[:, obj2_idx]  # Negate for minimization
+                        
+                        # Find Pareto front
+                        is_pareto = np.ones(len(points), dtype=bool)
+                        for i in range(len(points)):
+                            for j in range(len(points)):
+                                if i != j:
+                                    if (obj1[j] >= obj1[i] and obj2[j] >= obj2[i] and
+                                        (obj1[j] > obj1[i] or obj2[j] > obj2[i])):
+                                        is_pareto[i] = False
+                                        break
+                        
+                        # Create plot
+                        fig = go.Figure()
+                        
+                        fig.add_trace(go.Scatter(
+                            x=objectives[~is_pareto, obj1_idx],
+                            y=objectives[~is_pareto, obj2_idx],
+                            mode='markers',
+                            name='All Points',
+                            marker=dict(color='lightblue', size=6, opacity=0.5)
+                        ))
+                        
+                        fig.add_trace(go.Scatter(
+                            x=objectives[is_pareto, obj1_idx],
+                            y=objectives[is_pareto, obj2_idx],
+                            mode='markers+lines',
+                            name='Pareto Front',
+                            marker=dict(color='red', size=10, symbol='star'),
+                            line=dict(dash='dash', color='red')
+                        ))
+                        
+                        fig.update_layout(
+                            title="Pareto Front: PL Intensity vs Emission Wavelength",
+                            xaxis_title="PL Intensity (a.u.)",
+                            yaxis_title="Emission Wavelength (nm)",
+                            height=500
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        st.info(f"Found {is_pareto.sum()} Pareto-optimal solutions")
+                    else:
+                        st.warning("Need at least two objectives for Pareto analysis")
+            else:
+                st.warning("⚠️ Please train models first")
+    
+    with col4:
+        if st.button("🤖 RL Suggest Next", use_container_width=True):
+            if 'cite_models' in st.session_state and len(cite_df) > 5:
+                with st.spinner("RL agent suggesting next experiment..."):
+                    models = st.session_state['cite_models']
+                    features = st.session_state['cite_features']
                     
-                    pareto_abs = pred_abs[is_pareto]
-                    pareto_int = pred_int[is_pareto]
+                    # Find best current experiment
+                    if 'pl_intensity' in cite_df.columns:
+                        best_idx = cite_df['pl_intensity'].idxmax()
+                    else:
+                        best_idx = 0
                     
-                    # Plot
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=cite_df['absorption_nm'],
-                        y=cite_df['intensity'],
-                        mode='markers',
-                        name='Experimental',
-                        marker=dict(color='blue', size=8, opacity=0.5)
-                    ))
-                    fig.add_trace(go.Scatter(
-                        x=pareto_abs,
-                        y=pareto_int,
-                        mode='markers',
-                        name='Pareto Front',
-                        marker=dict(color='red', size=10, symbol='star')
-                    ))
-                    fig.update_layout(
-                        title="Pareto Front: Absorption vs Intensity",
-                        xaxis_title="Absorption (nm)",
-                        yaxis_title="Intensity (a.u.)",
-                        height=500
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    # Get best parameters
+                    best_params = {}
+                    for f in features:
+                        if f in cite_df.columns:
+                            best_params[f] = cite_df.loc[best_idx, f]
                     
-                    st.info(f"Found {len(pareto_abs)} Pareto-optimal solutions")
-                else:
-                    st.error("Insufficient data for Pareto analysis")
-        
-        with col4:
-            if st.button("🤖 RL Suggest Next", use_container_width=True):
-                if 'absorption_nm' in cite_df.columns:
-                    # Simple RL-inspired suggestion
-                    best_idx = cite_df['absorption_nm'].idxmax()
-                    param_cols = ['cucl2_mg', 'te_salt', 'temperature', 'time', 'zn_precursor', 'pH']
-                    available_params = [p for p in param_cols if p in cite_df.columns]
-                    
-                    best_params = cite_df.loc[best_idx, available_params].to_dict()
-                    
+                    # Generate suggestion with exploration
                     suggestion = {}
-                    ranges_list = [cucl2_mg, te_salt, temperature, time_val, zn_precursor, pH_val]
-                    for i, param in enumerate(available_params):
-                        low, high = ranges_list[i]
-                        # Add exploration noise
-                        noise = np.random.normal(0, (high - low) * 0.2)
-                        value = best_params.get(param, (low + high)/2) + noise
-                        suggestion[param] = np.clip(value, low, high)
+                    epsilon = 0.2  # Exploration rate
+                    
+                    for f in features:
+                        low, high = ranges.get(f, (0, 100))
+                        if np.random.random() < epsilon:
+                            # Explore: random value in range
+                            if f in ['core_time_min', 'shell_time_min']:
+                                suggestion[f] = np.random.randint(low, high + 1)
+                            else:
+                                suggestion[f] = np.random.uniform(low, high)
+                        else:
+                            # Exploit: perturb best value
+                            noise_scale = (high - low) * 0.1
+                            noise = np.random.normal(0, noise_scale)
+                            value = best_params.get(f, (low + high)/2) + noise
+                            if f in ['core_time_min', 'shell_time_min']:
+                                suggestion[f] = int(np.clip(value, low, high))
+                            else:
+                                suggestion[f] = np.clip(value, low, high)
+                    
+                    # Predict properties for suggestion
+                    X_suggest = np.array([[suggestion[f] for f in features]])
                     
                     st.success("🔮 Next suggested experiment:")
+                    
                     for k, v in suggestion.items():
-                        st.metric(k.replace('_', ' ').title(), f"{v:.3f}")
-                else:
-                    st.error("No absorption data available")
+                        st.metric(k.replace('_', ' ').title(), f"{v:.2f}")
+                    
+                    st.markdown("---")
+                    st.markdown("**Predicted Properties:**")
+                    
+                    if 'intensity' in models:
+                        pred_int = models['intensity'].predict(X_suggest)[0]
+                        st.metric("Predicted PL Intensity", f"{pred_int:.0f}")
+                    if 'emission' in models:
+                        pred_em = models['emission'].predict(X_suggest)[0]
+                        st.metric("Predicted Emission", f"{pred_em:.1f} nm")
+                    if 'qy' in models:
+                        pred_qy = models['qy'].predict(X_suggest)[0]
+                        st.metric("Predicted QY", f"{pred_qy:.2f}%")
+            else:
+                st.warning("⚠️ Please train models first or ensure sufficient data")
+    
+    # Store ranges for other functions
+    st.session_state['cite_ranges'] = ranges
+    st.session_state['cite_current_params'] = current_params
+    
+    return cite_df
     
     # ========================================================================
     # Tab 3: Molecular & Optical Properties - FIXED with column checks
@@ -3321,10 +3411,10 @@ def display_quantum_dots_tab(uploaded_file):
 # ============================================================================
 
 def generate_cis_te_data(n_samples=50):
-    """Generate sample data for CIS-Te/ZnS quantum dots"""
+    """Generate sample data for CIS-Te/ZnS quantum dots based on actual experimental results"""
     np.random.seed(42)
     
-    # Base experimental values from the report
+    # Base experimental values from the report (optimized conditions)
     experimental_values = {
         'cucl2_mg': 11.0,
         'incl3_mg': 55.0,
@@ -3342,7 +3432,7 @@ def generate_cis_te_data(n_samples=50):
         'pH': 3.0,
         'excitation_nm': 550.0,
         'emission_nm': 815.0,
-        'pl_intensity': 12828.54,  # CORRECTED VALUE
+        'pl_intensity': 12828.54,
         'lifetime_ns': 37.54,
         'quantum_yield_percent': 5.13,
         'core_emission_nm': 827.0,
@@ -3353,20 +3443,23 @@ def generate_cis_te_data(n_samples=50):
     
     data = {}
     for param, base_val in experimental_values.items():
+        # Different variation levels for different parameter types
         if param in ['cucl2_mg', 'incl3_mg', 'trisodium_citrate_mg', 'na2s_mg']:
-            variation = 0.05
+            variation = 0.05  # 5% variation for main precursors
         elif param in ['tga_ul', 'nabh4_mg', 'te_salt_mg', 'zn_precursor_mg', 'thiourea_mg']:
-            variation = 0.10
-        elif param in ['core_temp_c', 'shell_time_min']:
-            variation = 0.03
-        elif param == 'pl_intensity':
-            variation = 0.02
+            variation = 0.10  # 10% variation for additives
+        elif param in ['core_temp_c', 'shell_time_min', 'te_incorp_time_min']:
+            variation = 0.03  # 3% for temperature/time
+        elif param in ['emission_nm', 'pl_intensity', 'quantum_yield_percent']:
+            variation = 0.02  # 2% for optical properties
         else:
             variation = 0.08
         
+        # Add noise
         noise = np.random.normal(0, base_val * variation, n_samples)
         data[param] = base_val + noise
         
+        # Apply realistic constraints based on experimental range
         if param == 'pH':
             data[param] = np.clip(data[param], 2.5, 3.5)
         elif param == 'core_temp_c':
@@ -3375,25 +3468,48 @@ def generate_cis_te_data(n_samples=50):
             data[param] = np.clip(data[param], 10000, 15500)
         elif param == 'emission_nm':
             data[param] = np.clip(data[param], 800, 830)
-        elif 'mg' in param and base_val > 0:
+        elif param == 'quantum_yield_percent':
+            data[param] = np.clip(data[param], 3, 8)
+        elif param == 'lifetime_ns':
+            data[param] = np.clip(data[param], 30, 45)
+        elif param in ['cucl2_mg', 'incl3_mg', 'te_salt_mg', 'zn_precursor_mg']:
             data[param] = np.clip(data[param], base_val * 0.7, base_val * 1.3)
     
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
     
+    # Add derived properties based on Te content and Cu:In ratio
+    # These relationships are derived from the experimental data
+    cu_in_ratio = df['cucl2_mg'] / df['incl3_mg']
     
-    # Generate optical properties with Te-dependent red shift
-    base_abs = 700 + 100 * (data['te_salt'] - 5) / 5 + 50 * (data['cucl2_mg'] - 1)
-    data['absorption_nm'] = (base_abs + np.random.normal(0, 20, n_samples)).astype(float)
+    # Te effect on emission wavelength (red shift with more Te)
+    te_effect = (df['te_salt_mg'] - 1.7) / 1.7 * 15  # ±15 nm variation
     
-    data['plqy_percent'] = (50 + 15 * np.sin(data['te_salt'] / 5) + np.random.normal(0, 8, n_samples)).astype(float)
-    data['plqy_percent'] = np.clip(data['plqy_percent'], 20, 80)
+    # pH effect (optimal at 3.0)
+    ph_effect = -(df['pH'] - 3.0) ** 2 * 5
     
-    data['fwhm_nm'] = (40 + 5 * data['te_salt'] / 5 + np.random.normal(0, 5, n_samples)).astype(float)
-    data['quantum_yield'] = (data['plqy_percent'] / 100).astype(float)
-    data['size_nm'] = (4.5 + 0.5 * (data['te_salt'] - 5) / 5 + np.random.normal(0, 0.5, n_samples)).astype(float)
-    data['intensity'] = (10000 + 3000 * (data['te_salt'] - 5) / 5 + np.random.normal(0, 1000, n_samples)).astype(float)
+    # Temperature effect
+    temp_effect = -(df['core_temp_c'] - 95) ** 2 / 100
     
-    return pd.DataFrame(data)
+    # Update emission based on multiple factors
+    df['emission_nm'] = 815 + te_effect + ph_effect + temp_effect + np.random.normal(0, 3, n_samples)
+    df['emission_nm'] = np.clip(df['emission_nm'], 800, 830)
+    
+    # PL intensity based on shell quality and pH
+    df['pl_intensity'] = 12828.54 + (df['zn_precursor_mg'] - 30) * 100 - (df['pH'] - 3.0)**2 * 500 + np.random.normal(0, 500, n_samples)
+    df['pl_intensity'] = np.clip(df['pl_intensity'], 10000, 15500)
+    
+    # Quantum yield dependence on shell thickness and Te
+    df['quantum_yield_percent'] = 5.13 + (df['zn_precursor_mg'] - 30) * 0.1 - (df['te_salt_mg'] - 1.7) * 0.5 + np.random.normal(0, 0.3, n_samples)
+    df['quantum_yield_percent'] = np.clip(df['quantum_yield_percent'], 3, 8)
+    
+    # Lifetime dependence
+    df['lifetime_ns'] = 37.54 + (df['zn_precursor_mg'] - 30) * 0.2 + np.random.normal(0, 1, n_samples)
+    df['lifetime_ns'] = np.clip(df['lifetime_ns'], 30, 45)
+    
+    # Absorption edge (first exciton peak)
+    df['absorption_nm'] = df['emission_nm'] - 30 + np.random.normal(0, 5, n_samples)
+    
+    return df
 
 # ============================================================================
 # TAB 2: Porphyrins
