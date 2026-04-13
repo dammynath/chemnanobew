@@ -2280,7 +2280,7 @@ def display_quantum_dots_tab(uploaded_file):
                     
                     # Prepare features
                     feature_cols = ['cucl2_mg', 'incl3_mg', 'te_salt_mg', 'zn_precursor_mg', 
-                                   'core_temp_c', 'core_time_min', 'pH', 'shell_time_min']
+                   'core_temp_c', 'core_time_min', 'pH', 'shell_time_min']
                     
                     # Check available features
                     available_features = [f for f in feature_cols if f in cite_df.columns]
