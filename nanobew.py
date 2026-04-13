@@ -3497,12 +3497,12 @@ def generate_cis_te_data(n_samples=50):
 # TAB 2: Porphyrins
 # ============================================================================
 def display_porphyrins_tab(uploaded_file):
-    """PorpHyrins tab content with DoE and RL tools"""
-    st.markdown("<h2 class='sub-header'>PorpHyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
+    """Porphyrins tab content with DoE and RL tools"""
+    st.markdown("<h2 class='sub-header'>Porphyrin Synthesis Optimization</h2>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class='info-box'>
-    Optimize porpHyrin synthesis for maximum yield, purity, and singlet oxygen generation using 
+    Optimize porphyrin synthesis for maximum yield, purity, and singlet oxygen generation using 
     Design of Experiments (DoE), Bayesian Optimization, and Reinforcement Learning.
     </div>
     """, unsafe_allow_html=True)
@@ -3512,10 +3512,10 @@ def display_porphyrins_tab(uploaded_file):
         data = DataManager.load_data(uploaded_file)
         if data is None:
             st.warning("⚠️ Could not load uploaded file. Using sample data instead.")
-            data = DataManager.create_sample_porpHyrin_data(50)
+            data = DataManager.create_sample_porphyrin_data(50)
     else:
-        data = DataManager.create_sample_porpHyrin_data(50)
-        st.info("📊 Using sample porpHyrin data. Upload your own CSV for real optimization.")
+        data = DataManager.create_sample_porphyrin_data(50)
+        st.info("📊 Using sample porphyrin data. Upload your own CSV for real optimization.")
     
     if data is None:
         st.error("Failed to load data")
@@ -3533,7 +3533,7 @@ def display_porphyrins_tab(uploaded_file):
     
     with por_tabs[0]:
         if len(data) > 0:
-            st.markdown("### PorpHyrin Synthesis Data")
+            st.markdown("### Porphyrin Synthesis Data")
             st.dataframe(data.head(10), use_container_width=True)
             
             col1, col2, col3, col4 = st.columns(4)
@@ -3631,7 +3631,7 @@ def display_porphyrins_tab(uploaded_file):
         st.markdown("### 🔮 Molecular Property Prediction")
         
         smiles = st.text_input(
-            "Enter PorpHyrin SMILES string",
+            "Enter Porphyrin SMILES string",
             value="C1=CC2=NC1=CC3=CC=C(N3)C=C4C=CC(=N4)C=C5C=CC(=N5)C=C2",
             key="por_smiles"
         )
@@ -3698,7 +3698,7 @@ def display_porphyrins_tab(uploaded_file):
                 st.metric("Estimated Quantum Yield", f"{qy:.3f}")
     
     with por_tabs[3]:
-        st.markdown("### 📐 Design of Experiments for PorpHyrin Synthesis")
+        st.markdown("### 📐 Design of Experiments for Porphyrin Synthesis")
         
         col1, col2 = st.columns(2)
         
@@ -3774,7 +3774,7 @@ def display_porphyrins_tab(uploaded_file):
             st.download_button(
                 label="📥 Download Design as CSV",
                 data=csv,
-                file_name=f"porpHyrin_doe_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                file_name=f"porphyrin_doe_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
     
@@ -4057,7 +4057,7 @@ def display_molecular_generator_tab():
                 
                 prior_model = st.selectbox(
                     "Prior Model",
-                    ["priors/reinvent.prior", "priors/porpHyrin_prior.prior", "priors/chembl.prior"],
+                    ["priors/reinvent.prior", "priors/porphyrin_prior.prior", "priors/chembl.prior"],
                     key="reinvent_prior"
                 )
                 reinvent.prior_model = prior_model
@@ -4067,7 +4067,7 @@ def display_molecular_generator_tab():
         if st.button("🚀 Generate Novel Molecules", use_container_width=True, type="primary"):
             with st.spinner("Generating molecules..."):
                 if reinvent.available:
-                    config = reinvent.create_porpHyrin_config(
+                    config = reinvent.create_porphyrin_config(
                         target_absorbance=target_abs,
                         target_fluorescence=target_fluor,
                         target_qy=target_qy,
@@ -4103,7 +4103,7 @@ def display_molecular_generator_tab():
         with col1:
             base_scaffold = st.text_input(
                 "Base Scaffold SMILES",
-                value=reinvent.get_default_porpHyrin_scaffold(),
+                value=reinvent.get_default_porphyrin_scaffold(),
                 key="scaffold_smiles"
             )
             
@@ -4124,7 +4124,7 @@ def display_molecular_generator_tab():
         if st.button("🎯 Generate Scaffold Variants", use_container_width=True):
             with st.spinner("Generating scaffold variants..."):
                 if reinvent.available:
-                    config = reinvent.create_porpHyrin_config(
+                    config = reinvent.create_porphyrin_config(
                         target_absorbance=target_abs_scaffold,
                         target_fluorescence=target_fluor_scaffold,
                         num_molecules=num_variants,
@@ -4157,7 +4157,7 @@ def display_molecular_generator_tab():
         with col1:
             core_smiles = st.text_input(
                 "Core SMILES with R-group markers",
-                value=reinvent.get_default_porpHyrin_scaffold(),
+                value=reinvent.get_default_porphyrin_scaffold(),
                 key="core_smiles",
                 help="Use '*' to mark R-group positions"
             )
