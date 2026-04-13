@@ -2143,10 +2143,10 @@ def display_cis_te_optimizer(data, qd_manager):
     </div>
     """, unsafe_allow_html=True)
     
-    with qd_tabs[1]:
-        cite_data = display_cis_te_optimizer(data, qd_manager)
-        if cite_data is not None:
-            data = cite_data
+    #with qd_tabs[1]:
+     #   cite_data = display_cis_te_optimizer(data, qd_manager)
+      #  if cite_data is not None:
+       #     data = cite_data
 
     col1, col2 = st.columns(2)
     
